@@ -59,7 +59,6 @@ class GridEnv(Game):
         self.state_tmp = []
         self.initial_board = None
         self.board = None
-        self.table = None
 
         self.over = 0
 
@@ -139,15 +138,6 @@ class GridEnv(Game):
                 core.draw.rect(self.window,
                                OBJECTS[obj]['color'],
                                (box_w*j+1, box_h*i+1, box_w-1, box_h-1))
-                if obj == E:
-                    val = np.max(self.table[i][j])
-                    if val > 0:
-                        color = (0, 255*(val/max(REWARDS)), 0)
-                    else:
-                        color = (0, 0, 0)
-                    core.draw.rect(self.window,
-                                   color,
-                                   (box_w*j+1, box_h*i+1, box_w-1, box_h-1))
 
     def _check_action(self, action):
         self.state_tmp = self.state.copy()
