@@ -1,11 +1,21 @@
 import pygame as pg    # noqa
+import platform
 
 
 class Game:
 
     def __init__(self) -> None:
         if not pg.get_init():
-            pg.init()
+            os = platform.system()
+            if os == "Linux":
+                # On linux pg.quit hangs. Some pygame modules don't work properly on linux
+                # Since we're using only display module for this package, initializing only display will do the trick
+                pg.display.init()
+            elif os == "Windows":
+                # Windows not affected by this issue. So it's good to init all modules
+                pg.init()
+            else:
+                print("[Warning] - Unknown platform, pygame not initialized")
 
         # Main window
         self.title: str = 'PyGameWindow'
