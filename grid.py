@@ -12,11 +12,11 @@ OBJECTS = [
     {'color': (255, 255, 0), 'id': 3},    # Agent
     {'color': (0, 255, 0), 'id': 4}       # Goal
 ]
-E = OBJECTS[0]['id']
-B = OBJECTS[1]['id']
-H = OBJECTS[2]['id']
-A = OBJECTS[3]['id']
-G = OBJECTS[4]['id']
+E = OBJECTS[0]['id']  # Empty
+W = OBJECTS[1]['id']  # Wall
+H = OBJECTS[2]['id']  # Hole
+A = OBJECTS[3]['id']  # Agent
+G = OBJECTS[4]['id']  # Goal
 
 # Moves
 UP = 0
@@ -32,35 +32,38 @@ TERMINATE = 3
 
 # Rewards
 REWARDS = [
-    -1,   # Empty move
-    -1,   # Stayed inplace
-    -10,  # Fell through hole
-    10    # Found goal
+    0,   # Empty move
+    -30,   # Stayed inplace
+    -100,  # Fell through hole
+    100    # Found goal
 ]
 
 EPISODE_TERMINATING_POLICY = [
-    0,  # Empty move - RESUME
-    0,  # Stayed inplace - RESUME
-    1,  # Fell through hole - TERMINATE
-    1   # Found goal - TERMINATE
+    False,  # Empty move - RESUME
+    False,  # Stayed inplace - RESUME
+    True,   # Fell through hole - TERMINATE
+    True    # Found goal - TERMINATE
 ]
 
 
 class GridEnv(Game):
 
     def __init__(self, env_file: str = None) -> None:
+        """
+        @param:
+        env_file: str (default None) Load environment config from file.
+        """
         super().__init__()
-
-        self.size = (600, 600)
+        self.box_size = 100
+        self.fps = 30
         self.window_flags = 0
         self.initial_agent_location = None
         self.initial_goal_location = None
-        self.state = None
-        self.state_tmp = []
+        self.agent_location = None
         self.initial_board = None
         self.board = None
-
-        self.over = 0
+        self.model = None
+        self.over = False
 
         if env_file:
             self.load_env(env_file)
@@ -70,40 +73,45 @@ class GridEnv(Game):
                                            [A, E, E, E, E]])
             self.initial_agent_location = [2, 0]
             self.initial_goal_location = [0, 4]
+        shape = self.initial_board.shape
+        self.size = (shape[1] * self.box_size, shape[0] * self.box_size)
         self.set_window()
 
     @property
-    def state_space(self):
+    def state_space_size(self):
         return self.initial_board.shape
 
     @property
-    def action_space(self):
+    def action_space_size(self):
         return 4
 
+    @property
+    def observation_size(self):
+        return 2
+
     def reset(self):
-        self.over = 0
-        self.state = self.initial_agent_location.copy()
+        self.over = False
+        shape = self.initial_board.shape
+        while True:
+            x = np.random.randint(0, shape[1])
+            y = np.random.randint(0, shape[0])
+            if (self.initial_board[y, x] == E):
+                self.agent_location = [y, x]
+                break
         self.board = copy.deepcopy(self.initial_board)
-        return tuple(self.state.copy())
+        return self.get_state()
 
     def step(self, action):
         res = self._check_action(action)
         # Valid move
-        if res == MOVABLE:
-            self._move()
-        # Agent reached goal position
-        elif res == TERMINATE:
-            self._move()
-        # Agent fell through hole
-        elif res == FALLING:
-            self._move()
-        # Agent hit wall
-        elif res == INPLACE:
-            pass
+        if res != INPLACE:
+            self._move(action)
         self.over = EPISODE_TERMINATING_POLICY[res]
-        reward = REWARDS[res]
-        state = self.state.copy()
-        return tuple(state), reward, self.over
+        done = self.over if res != INPLACE else True
+        return self.get_state(), REWARDS[res], done
+
+    def get_state(self):
+        return tuple(self.agent_location.copy())
 
     def loop_once(self) -> int:
         super().loop_once()
@@ -114,61 +122,94 @@ class GridEnv(Game):
             if event.key == core.K_q:
                 self.running = False
                 self.over = True
+            if event.key == core.K_SPACE:
+                self.rendering = not self.rendering
 
     def onRender(self) -> None:
         self._draw_grid()
 
     def _draw_grid(self):
         self.window.fill((0, 0, 0))
-        box_w = self.size[0] / (self.board.shape[1])
-        box_h = self.size[1] / (self.board.shape[0])
-        for i in range(1, self.board.shape[1]):
-            core.draw.line(self.window,
-                           (255, 255, 255),
-                           (box_w*i, 1),
-                           (box_w*i, self.size[1]-1))
-        for i in range(1, self.board.shape[0]):
-            core.draw.line(self.window,
-                           (255, 255, 255),
-                           (1, box_h*i),
-                           (self.size[0]-1, box_h*i))
         for i in range(self.board.shape[0]):
             for j in range(self.board.shape[1]):
                 obj = self.board[i, j]
+                x = self.box_size * j + 1
+                y = self.box_size * i + 1
                 core.draw.rect(self.window,
                                OBJECTS[obj]['color'],
-                               (box_w*j+1, box_h*i+1, box_w-1, box_h-1))
+                               (x, y, self.box_size - 1, self.box_size - 1))
+                if self.model is not None:
+                    if obj == E:
+                        for a in range(self.action_space_size):
+                            val = self.model[i][j][a]
+                            color_val = 255 * (abs(val) / max(REWARDS)) if val >= 0 else 255 * (-val / -min(REWARDS))
+                            if color_val > 255:
+                                color_val = 255
+                            color = (0, 0, color_val) if val >= 0 else (color_val, 0, 0)
+                            if a == UP:
+                                core.draw.polygon(self.window, color,
+                                                  [[x, y], [x + self.box_size, y],
+                                                   [x + self.box_size / 2, y + self.box_size / 2]])
+                            elif a == DOWN:
+                                core.draw.polygon(self.window, color,
+                                                  [[x + self.box_size / 2, y + self.box_size / 2],
+                                                   [x, y + self.box_size], [x + self.box_size, y + self.box_size]])
+                            elif a == LEFT:
+                                core.draw.polygon(self.window, color,
+                                                  [[x + self.box_size / 2, y + self.box_size / 2],
+                                                   [x, y], [x, y + self.box_size]])
+                            elif a == RIGHT:
+                                core.draw.polygon(self.window, color,
+                                                  [[x + self.box_size / 2, y + self.box_size / 2],
+                                                   [x + self.box_size, y], [x + self.box_size, y + self.box_size]])
+                        core.draw.line(self.window, (100,) * 3, (x, y), (x + self.box_size, y + self.box_size))
+                        core.draw.line(self.window, (100,) * 3, (x, y + self.box_size), (x + self.box_size, y))
+
+        for i in range(1, self.board.shape[1]):
+            core.draw.line(self.window,
+                           (255, 255, 255),
+                           (self.box_size * i, 1),
+                           (self.box_size * i, self.size[1] - 1))
+        for i in range(1, self.board.shape[0]):
+            core.draw.line(self.window,
+                           (255, 255, 255),
+                           (1, self.box_size * i),
+                           (self.size[0] - 1, self.box_size * i))
 
     def _check_action(self, action):
-        self.state_tmp = self.state.copy()
+        agent_location_tmp = self.agent_location.copy()
         if action == UP:
-            self.state_tmp[0] -= 1
+            agent_location_tmp[0] -= 1
         elif action == RIGHT:
-            self.state_tmp[1] += 1
+            agent_location_tmp[1] += 1
         elif action == DOWN:
-            self.state_tmp[0] += 1
+            agent_location_tmp[0] += 1
         elif action == LEFT:
-            self.state_tmp[1] -= 1
-        if 0 <= self.state_tmp[0] < self.board.shape[0] and \
-                0 <= self.state_tmp[1] < self.board.shape[1]:
-            obj = self.board[self.state_tmp[0], self.state_tmp[1]]
-            if obj == E:
-                return MOVABLE
-            if obj == G:
-                return TERMINATE
-            if obj == B:
-                return INPLACE
-            if obj == H:
-                return FALLING
+            agent_location_tmp[1] -= 1
+        obj = self.board[agent_location_tmp[0], agent_location_tmp[1]]
+        if obj == E:
+            return MOVABLE
+        if obj == G:
+            return TERMINATE
+        if obj == W:
+            return INPLACE
+        if obj == H:
+            return FALLING
         return INPLACE
 
-    def _move(self):
+    def _move(self, action):
         # Clear prev position
-        self.board[self.state[0], self.state[1]] = E
-        # Set state to new location
-        self.state = self.state_tmp.copy()
-        # Set state on board
-        self.board[self.state[0], self.state[1]] = A
+        self.board[self.agent_location[0], self.agent_location[1]] = E
+        if action == UP:
+            self.agent_location[0] -= 1
+        elif action == RIGHT:
+            self.agent_location[1] += 1
+        elif action == DOWN:
+            self.agent_location[0] += 1
+        elif action == LEFT:
+            self.agent_location[1] -= 1
+        # Set location on board
+        self.board[self.agent_location[0], self.agent_location[1]] = A
 
     def load_env(self, path):
         with open(path, newline='') as f:
@@ -179,12 +220,12 @@ class GridEnv(Game):
                 for j, cell in enumerate(row):
                     if cell == 'E':
                         encoded_row.append(E)
-                    elif cell == 'B':
-                        encoded_row.append(B)
+                    elif cell == 'W':
+                        encoded_row.append(W)
                     elif cell == 'H':
                         encoded_row.append(H)
                     elif cell == 'A':
-                        encoded_row.append(A)
+                        encoded_row.append(E)
                         self.initial_agent_location = [i, j]
                     elif cell == 'G':
                         encoded_row.append(G)
