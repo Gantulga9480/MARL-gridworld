@@ -1,7 +1,8 @@
 class Agent:
 
-    def __init__(self, action_space: list, lr: float, y: float, e_decay: float = 0.99999) -> None:
-        self.action_space = action_space
+    def __init__(self, state_space_size: int, action_space_size: int, lr: float, y: float, e_decay: float = 0.99999) -> None:
+        self.action_space_size = action_space_size
+        self.state_space_size = state_space_size
         self.lr = lr
         self.y = y
         self.e = 1

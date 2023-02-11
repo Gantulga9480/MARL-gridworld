@@ -4,8 +4,8 @@ from .agent import Agent
 
 class QLAgent(Agent):
 
-    def __init__(self, action_space: list, lr: float, y: float, e_decay: float = 0.99999) -> None:
-        super().__init__(action_space, lr, y, e_decay)
+    def __init__(self, state_space_size: int, action_space_size: int, lr: float, y: float, e_decay: float = 0.99999) -> None:
+        super().__init__(state_space_size, action_space_size, lr, y, e_decay)
 
     def create_model(self, dim: tuple) -> None:
         self.model = np.zeros(dim)
