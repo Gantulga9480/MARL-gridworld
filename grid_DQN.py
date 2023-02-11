@@ -27,9 +27,9 @@ MAIN_NET_TRAIN_FREQ = 1
 CURRENT_TRAIN_ID = '2023-02-11'
 
 environment = GridEnv(env_file="boards/board3.csv")
-agent = DQNAgent(environment.observation_size, environment.action_space, 0.003, 0.99, e_decay=0.9999, device="cuda:0")
-agent.create_model(DQN(environment.observation_size, environment.action_space),
-                   DQN(environment.observation_size, environment.action_space),
+agent = DQNAgent(environment.observation_size, environment.action_space_size, 0.003, 0.99, e_decay=0.9999, device="cuda:0")
+agent.create_model(DQN(environment.observation_size, environment.action_space_size),
+                   DQN(environment.observation_size, environment.action_space_size),
                    batchs=BATCH_SIZE,
                    train_freq=MAIN_NET_TRAIN_FREQ,
                    update_freq=TARGET_NET_UPDATE_FREQ)
