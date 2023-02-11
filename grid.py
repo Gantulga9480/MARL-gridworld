@@ -54,7 +54,7 @@ class GridEnv(Game):
         env_file: str (default None) Load environment config from file.
         """
         super().__init__()
-        self.box_size = 100
+        self.box_size = 80
         self.fps = 30
         self.window_flags = 0
         self.initial_agent_location = None
