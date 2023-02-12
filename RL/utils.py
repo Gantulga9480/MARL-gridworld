@@ -27,8 +27,6 @@ class ReplayBuffer(ReplayBufferBase):
 
     def __init__(self, max_size, min_size) -> None:
         super().__init__(max_size, min_size)
-        self.max_size = max_size
-        self.min_size = min_size
         self.buffer = deque(maxlen=max_size)
 
     @property
@@ -52,8 +50,6 @@ class DoubleReplayBuffer(ReplayBufferBase):
 
     def __init__(self, max_size, min_size) -> None:
         super().__init__(max_size, min_size)
-        self.max_size = max_size
-        self.min_size = min_size
         self.buffer_new = deque(maxlen=max_size)
         self.buffer_old = deque(maxlen=max_size * 4)
 
@@ -76,5 +72,5 @@ class DoubleReplayBuffer(ReplayBufferBase):
         o_size = sample_size - n_size
         sn = random.sample(self.buffer_new, n_size)
         so = random.sample(self.buffer_old, o_size)
-        so.extend(so)
+        sn.extend(so)
         return sn
