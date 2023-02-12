@@ -32,10 +32,10 @@ TERMINATE = 3
 
 # Rewards
 REWARDS = [
-    0,   # Empty move
-    -30,   # Stayed inplace
-    -100,  # Fell through hole
-    100    # Found goal
+    -5,   # Empty move
+    -50,   # Stayed inplace
+    -200,  # Fell through hole
+    200    # Found goal
 ]
 
 EPISODE_TERMINATING_POLICY = [
