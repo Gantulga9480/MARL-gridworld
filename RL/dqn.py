@@ -61,12 +61,14 @@ class DQNAgent(Agent):
             print('Model file not found!')
             exit()
 
+    @torch.no_grad()
     def policy(self, state, greedy=False):
         """greedy - False (default) for training, True for inference"""
         self.step_count += 1
+        self.model.eval()
         state = torch.Tensor(state).to(self.device)
-        batch = len(state.size()) > 1
-        if not batch:
+        is_batch = len(state.size()) > 1
+        if not is_batch:
             if not greedy and np.random.random() < self.e:
                 return np.random.choice(list(range(self.action_space_size)))
             else:
@@ -101,10 +103,12 @@ class DQNAgent(Agent):
         if not self.batchs or not self.epochs:
             raise AttributeError("Model not configured!, set batch size and epoch count")
         self.train_count += 1
+        self.model.eval()
         current_states = torch.Tensor([item[0] for item in samples]).to(self.device)
         new_current_state = torch.Tensor([item[2] for item in samples]).to(self.device)
-        current_qs = self.model(current_states)
-        future_qs = self.target_model(new_current_state)
+        with torch.no_grad():
+            current_qs = self.model(current_states)
+            future_qs = self.target_model(new_current_state)
 
         for index, (_, action, _, reward, done) in enumerate(samples):
             if not done:
@@ -114,9 +118,12 @@ class DQNAgent(Agent):
 
             current_qs[index][action] = new_q
 
+        self.model.train()
+
         preds = self.model(current_states)
         loss = self.loss_fn(preds, current_qs).to(self.device)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        print(f"Train: {self.train_count} - loss ---> ", loss.item())
+        if self.train_count % 100 == 0:
+            print(f"Train: {self.train_count} - loss ---> ", loss.item())
