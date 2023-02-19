@@ -19,13 +19,18 @@ class PG(torch.nn.Module):
         x = F.relu(x)
         x = self.fc2(x)
         x = F.softmax(x, dim=1)
-        m = Categorical(x)
+        try:
+            m = Categorical(x)
+        except ValueError:
+            for param in self.fc1.parameters():
+                print(param)
+            raise ValueError()
         action = m.sample()
         return action.item(), m.log_prob(action)
 
 
 env = GridEnv(env_file="boards/board1.csv")
-agent = PGAgent(env.observation_size, env.action_space_size)
+agent = PGAgent(env.observation_size, env.action_space_size, device="cuda:0")
 agent.create_model(PG)
 agent.create_buffer(ReplayBuffer(1000, 1000))
 
@@ -38,7 +43,6 @@ while env.running:
         ns, r, d = env.step(a)
         agent.learn(r, d)
         s = ns
-
         rewards.append(r)
 
 with open('reward.txt', 'w') as f:

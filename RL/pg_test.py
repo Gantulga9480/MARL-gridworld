@@ -88,5 +88,5 @@ class PGAgent(Agent):
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        if self.train_count % 100 == 0:
+        if self.train_count % 10 == 0:
             print(f"Train: {self.train_count} - loss ---> ", loss.item())
