@@ -1,13 +1,13 @@
 class Agent:
 
-    def __init__(self, state_space_size: int, action_space_size: int, lr: float, y: float, e_decay: float = 0.99999) -> None:
+    def __init__(self, state_space_size: int, action_space_size: int) -> None:
         self.action_space_size = action_space_size
         self.state_space_size = state_space_size
-        self.lr = lr
-        self.y = y
+        self.lr = 0.001
+        self.y = 0.99
         self.e = 1
         self.e_min = 0.01
-        self.e_decay = e_decay
+        self.e_decay = 0.999999
         self.model = None
         self.train = True
         self.step_count = 0

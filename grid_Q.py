@@ -2,7 +2,8 @@ from grid import GridEnv
 from RL import QLAgent
 
 environment = GridEnv(env_file="boards/board1.csv")
-agent = QLAgent(environment.state_space_size, environment.action_space_size, 0.1, 0.9, 0.99995)
+agent = QLAgent(environment.state_space_size, environment.action_space_size)
+agent.create_model()
 environment.model = agent.model
 
 while environment.running:

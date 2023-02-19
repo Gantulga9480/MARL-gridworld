@@ -1,5 +1,4 @@
 import torch
-from torch import nn
 import numpy as np
 import os
 from .agent import Agent
@@ -8,8 +7,8 @@ from .utils import ReplayBufferBase
 
 class DQNAgent(Agent):
 
-    def __init__(self, state_space_size: int, action_space_size: int, lr: float, y: float, e_decay: float = 0.99999, device: str = 'cpu', seed: int = 1) -> None:
-        super(DQNAgent, self).__init__(state_space_size, action_space_size, lr, y, e_decay)
+    def __init__(self, state_space_size: int, action_space_size: int, device: str = 'cpu', seed: int = 1) -> None:
+        super(DQNAgent, self).__init__(state_space_size, action_space_size)
         torch.manual_seed(seed)
         np.random.seed(seed)
         self.target_model = None
@@ -26,7 +25,10 @@ class DQNAgent(Agent):
             buffer.min_size = self.batchs
         self.buffer = buffer
 
-    def create_model(self, model: torch.nn.Module, batchs: int = 64, main_train_freq: int = 1, target_update_freq: int = 100):
+    def create_model(self, model: torch.nn.Module, lr: float = 0.001, y: float = 0.99, e_decay: float = 0.999999, batchs: int = 64, main_train_freq: int = 1, target_update_freq: int = 100):
+        self.lr = lr
+        self.y = y
+        self.e_decay = e_decay
         self.model = model(self.state_space_size, self.action_space_size)
         self.target_model = model(self.state_space_size, self.action_space_size)
         self.target_model.load_state_dict(self.model.state_dict())
@@ -37,7 +39,7 @@ class DQNAgent(Agent):
         self.batchs = batchs
         self.main_train_freq = main_train_freq
         self.target_update_freq = target_update_freq
-        self.loss_fn = nn.MSELoss()
+        self.loss_fn = torch.nn.MSELoss()
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
     def save_model(self, path: str) -> None:

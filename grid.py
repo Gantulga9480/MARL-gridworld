@@ -32,10 +32,10 @@ TERMINATE = 3
 
 # Rewards
 REWARDS = [
-    -5,   # Empty move
-    -30,   # Stayed inplace
-    -100,  # Fell through hole
-    100    # Found goal
+    0,   # Empty move
+    -0.3,   # Stayed inplace
+    -1,  # Fell through hole
+    1    # Found goal
 ]
 
 EPISODE_TERMINATING_POLICY = [
@@ -100,7 +100,7 @@ class GridEnv(Game):
                 self.agent_location = [y, x]
                 break
         self.board = copy.deepcopy(self.initial_board)
-        return self.get_state_dqn()
+        return self.get_state()
 
     def step(self, action):
         res = self._check_action(action)
@@ -108,16 +108,18 @@ class GridEnv(Game):
         if res != INPLACE:
             self._move(action)
         self.over = EPISODE_TERMINATING_POLICY[res]
-        done = self.over if res != INPLACE else True
-        return self.get_state_dqn(), REWARDS[res], done
+        return self.get_state(), REWARDS[res], self.over
+
+    def get_state(self):
+        return self.get_state_dqn()
 
     def get_state_dqn(self):
-        up = self.board[self.agent_location[0] - 1, self.agent_location[1]]
-        down = self.board[self.agent_location[0] + 1, self.agent_location[1]]
-        left = self.board[self.agent_location[0], self.agent_location[1] - 1]
-        right = self.board[self.agent_location[0], self.agent_location[1] + 1]
-        x = self.agent_location[0]
-        y = self.agent_location[1]
+        up = self.board[self.agent_location[0] - 1, self.agent_location[1]] / 4
+        down = self.board[self.agent_location[0] + 1, self.agent_location[1]] / 4
+        left = self.board[self.agent_location[0], self.agent_location[1] - 1] / 4
+        right = self.board[self.agent_location[0], self.agent_location[1] + 1] / 4
+        x = self.agent_location[0] / self.initial_board.shape[1]
+        y = self.agent_location[1] / self.initial_board.shape[0]
         return (x, y, up, right, down, left)
 
     def get_state_q(self):
@@ -153,7 +155,8 @@ class GridEnv(Game):
                         for a in range(self.action_space_size):
                             val = self.model[i][j][a]
                             color_val = 255 * (abs(val) / max(REWARDS)) if val >= 0 else 255 * (-val / -min(REWARDS))
-                            # if color_val > 255:
+                            if color_val > 255:
+                                color_val = 255
                             color_val = 100
                             color = (0, 0, color_val) if val >= 0 else (color_val, 0, 0)
                             if a == UP:
