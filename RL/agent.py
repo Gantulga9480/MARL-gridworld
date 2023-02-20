@@ -1,8 +1,8 @@
 class Agent:
 
     def __init__(self, state_space_size: int, action_space_size: int) -> None:
-        self.action_space_size = action_space_size
         self.state_space_size = state_space_size
+        self.action_space_size = action_space_size
         self.lr = 0.001
         self.y = 0.99
         self.e = 1
@@ -12,6 +12,7 @@ class Agent:
         self.train = True
         self.step_count = 0
         self.episode_count = 0
+        self.train_count = 0
 
     def create_model(self, *args, **kwargs) -> None:
         pass
