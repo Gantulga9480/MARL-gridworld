@@ -10,11 +10,10 @@ class PGAgent(Agent):
         torch.manual_seed(seed)
         self.model = None
         self.device = device
-        self.train_count = 0
         self.log_probs = []
         self.rewards = []
 
-    def create_model(self, model: torch.nn.Module, lr: float = 0.01, y: float = 0.9):
+    def create_model(self, model: torch.nn.Module, lr: float, y: float):
         self.lr = lr
         self.y = y
         self.model = model(self.state_space_size, self.action_space_size)
@@ -47,9 +46,10 @@ class PGAgent(Agent):
         return action
 
     def learn(self, reward, episode_over):
-        self.rewards.append(reward)
-        if episode_over:
-            self.update_model()
+        if self.train:
+            self.rewards.append(reward)
+            if episode_over and self.train:
+                self.update_model()
 
     def update_model(self):
         self.train_count += 1
@@ -59,9 +59,7 @@ class PGAgent(Agent):
             last = (last * self.y + item)
             discounted_returns.append(last)
         returns = torch.tensor(list(reversed(discounted_returns)))
-        # print(returns)
         returns -= returns.mean()
-        # print(returns)
         if len(returns) > 1:
             returns /= (returns.std())
         loss = torch.tensor([-log_prob * discounted_return
@@ -69,11 +67,12 @@ class PGAgent(Agent):
                              in zip(self.log_probs, returns)],
                             requires_grad=True).sum()
 
-        # if self.train_count % 10 == 0:
-        print(f"Train: {self.train_count} - loss --------------------------> {loss.item()}")
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+
+        if self.train_count % 100 == 0:
+            print(f"Train: {self.train_count} | loss: {loss.item():.6f}")
 
         self.rewards = []
         self.log_probs = []

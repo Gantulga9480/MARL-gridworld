@@ -33,7 +33,7 @@ TERMINATE = 3
 # Rewards
 REWARDS = [
     0,   # Empty move
-    0,   # Stayed inplace
+    -0.2,   # Stayed inplace
     -1,  # Fell through hole or time expired
     1    # Found goal
 ]
@@ -92,15 +92,23 @@ class GridEnv(Game):
     def observation_size(self):
         return 6
 
-    def reset(self):
+    def reset(self, pos=None):
         self.over = False
-        shape = self.initial_board.shape
-        while True:
-            x = np.random.randint(1, shape[1] - 1)
-            y = np.random.randint(1, shape[0] - 1)
+        if pos:
+            y = pos[0]
+            x = pos[1]
             if (self.initial_board[y, x] == E):
                 self.agent_location = [y, x]
-                break
+            else:
+                raise ValueError()
+        else:
+            shape = self.initial_board.shape
+            while True:
+                x = np.random.randint(1, shape[1] - 1)
+                y = np.random.randint(1, shape[0] - 1)
+                if (self.initial_board[y, x] == E):
+                    self.agent_location = [y, x]
+                    break
         self.board = copy.deepcopy(self.initial_board)
         return self.get_state()
 
@@ -124,7 +132,8 @@ class GridEnv(Game):
         right = self.board[self.agent_location[0], self.agent_location[1] + 1]
         x = self.agent_location[0]
         y = self.agent_location[1]
-        return (x, y, up, right, down, left)
+        return (x, y, up, down, right, left)
+        # return self.board.flatten().tolist()
 
     def get_state_q(self):
         return tuple(self.agent_location.copy())
