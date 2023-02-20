@@ -1,8 +1,6 @@
 import torch
-import numpy as np
 import os
 from .agent import Agent
-from .utils import ReplayBufferBase
 
 
 class PGAgent(Agent):
@@ -10,27 +8,18 @@ class PGAgent(Agent):
     def __init__(self, state_space_size: int, action_space_size: int, device: str = 'cpu', seed: int = 1) -> None:
         super(PGAgent, self).__init__(state_space_size, action_space_size)
         torch.manual_seed(seed)
-        np.random.seed(seed)
         self.model = None
-        self.buffer = None
-        self.batchs = 0
         self.device = device
-        self.main_train_freq = 0
         self.train_count = 0
         self.log_probs = []
+        self.rewards = []
 
-    def create_buffer(self, buffer: ReplayBufferBase):
-        if buffer.min_size == 0:
-            buffer.min_size = self.batchs
-        self.buffer = buffer
-
-    def create_model(self, model: torch.nn.Module, lr: float = 0.0003, y: float = 0.9, batchs: int = 64):
+    def create_model(self, model: torch.nn.Module, lr: float = 0.01, y: float = 0.9):
         self.lr = lr
         self.y = y
         self.model = model(self.state_space_size, self.action_space_size)
         self.model.to(self.device)
         self.model.train()
-        self.batchs = batchs
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
     def save_model(self, path: str) -> None:
@@ -51,19 +40,14 @@ class PGAgent(Agent):
             exit()
 
     def policy(self, state):
-        """greedy - False (default) for training, True for inference"""
         self.step_count += 1
-        state = torch.Tensor(state).to(self.device)
+        state = torch.tensor(state, dtype=torch.float32).to(self.device)
         action, log_prob = self.model(state)
         self.log_probs.append(log_prob)
         return action
 
     def learn(self, reward, episode_over):
-        batch = len(np.array(reward).shape) > 1
-        if not batch:
-            self.buffer.push([reward, episode_over])
-        else:
-            self.buffer.extend([reward, episode_over])
+        self.rewards.append(reward)
         if episode_over:
             self.update_model()
 
@@ -71,22 +55,25 @@ class PGAgent(Agent):
         self.train_count += 1
         last = 0
         discounted_returns = []
-        for item in reversed(self.buffer.buffer):
-            last = (last * self.y + item[0])
+        for item in reversed(self.rewards):
+            last = (last * self.y + item)
             discounted_returns.append(last)
-        self.buffer.clear()
         returns = torch.tensor(list(reversed(discounted_returns)))
+        # print(returns)
         returns -= returns.mean()
-        returns /= (returns.std() + np.finfo(np.float32).eps.item())
+        # print(returns)
+        if len(returns) > 1:
+            returns /= (returns.std())
+        loss = torch.tensor([-log_prob * discounted_return
+                             for log_prob, discounted_return
+                             in zip(self.log_probs, returns)],
+                            requires_grad=True).sum()
 
-        loss = []
-        for log_prob, discounted_return in zip(self.log_probs, returns):
-            loss.append(-log_prob * discounted_return)
-        loss = torch.cat(loss).sum()
-        self.log_probs = []
-
+        # if self.train_count % 10 == 0:
+        print(f"Train: {self.train_count} - loss --------------------------> {loss.item()}")
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        if self.train_count % 10 == 0:
-            print(f"Train: {self.train_count} - loss ---> ", loss.item())
+
+        self.rewards = []
+        self.log_probs = []

@@ -33,8 +33,8 @@ TERMINATE = 3
 # Rewards
 REWARDS = [
     0,   # Empty move
-    -0.3,   # Stayed inplace
-    -1,  # Fell through hole
+    0,   # Stayed inplace
+    -1,  # Fell through hole or time expired
     1    # Found goal
 ]
 
@@ -64,6 +64,7 @@ class GridEnv(Game):
         self.board = None
         self.model = None
         self.over = False
+        self.step_count = 0
 
         if env_file:
             self.load_env(env_file)
@@ -75,6 +76,7 @@ class GridEnv(Game):
             self.initial_goal_location = [0, 4]
         shape = self.initial_board.shape
         self.size = (shape[1] * self.box_size, shape[0] * self.box_size)
+        self.max_step = (shape[1] - 1) * (shape[0] - 1)
         self.set_window()
         self.reset()
 
@@ -94,8 +96,8 @@ class GridEnv(Game):
         self.over = False
         shape = self.initial_board.shape
         while True:
-            x = np.random.randint(0, shape[1])
-            y = np.random.randint(0, shape[0])
+            x = np.random.randint(1, shape[1] - 1)
+            y = np.random.randint(1, shape[0] - 1)
             if (self.initial_board[y, x] == E):
                 self.agent_location = [y, x]
                 break
@@ -107,6 +109,8 @@ class GridEnv(Game):
         # Valid move
         if res != INPLACE:
             self._move(action)
+        if self.step_count % self.max_step == 0:
+            res = FALLING
         self.over = EPISODE_TERMINATING_POLICY[res]
         return self.get_state(), REWARDS[res], self.over
 
@@ -114,12 +118,12 @@ class GridEnv(Game):
         return self.get_state_dqn()
 
     def get_state_dqn(self):
-        up = self.board[self.agent_location[0] - 1, self.agent_location[1]] / 4
-        down = self.board[self.agent_location[0] + 1, self.agent_location[1]] / 4
-        left = self.board[self.agent_location[0], self.agent_location[1] - 1] / 4
-        right = self.board[self.agent_location[0], self.agent_location[1] + 1] / 4
-        x = self.agent_location[0] / self.initial_board.shape[1]
-        y = self.agent_location[1] / self.initial_board.shape[0]
+        up = self.board[self.agent_location[0] - 1, self.agent_location[1]]
+        down = self.board[self.agent_location[0] + 1, self.agent_location[1]]
+        left = self.board[self.agent_location[0], self.agent_location[1] - 1]
+        right = self.board[self.agent_location[0], self.agent_location[1] + 1]
+        x = self.agent_location[0]
+        y = self.agent_location[1]
         return (x, y, up, right, down, left)
 
     def get_state_q(self):
@@ -190,6 +194,7 @@ class GridEnv(Game):
                            (self.size[0] - 1, self.box_size * i))
 
     def _check_action(self, action):
+        self.step_count += 1
         agent_location_tmp = self.agent_location.copy()
         if action == UP:
             agent_location_tmp[0] -= 1
