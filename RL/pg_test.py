@@ -53,25 +53,25 @@ class PGAgent(Agent):
 
     def update_model(self):
         self.train_count += 1
-        last = 0
-        discounted_returns = []
-        for item in reversed(self.rewards):
-            last = (last * self.y + item)
-            discounted_returns.append(last)
-        returns = torch.tensor(list(reversed(discounted_returns)))
-        returns -= returns.mean()
-        if len(returns) > 1:
-            returns /= (returns.std())
-        loss = torch.tensor([-log_prob * discounted_return
-                             for log_prob, discounted_return
-                             in zip(self.log_probs, returns)],
+        G = []
+        r_sum = 0
+        for r in reversed(self.rewards):
+            r_sum = r_sum * self.y + r
+            G.append(r_sum)
+        G = torch.tensor(list(reversed(G)))
+        A = G - G.mean()  # Advantage (G - Baseline)
+        if len(A) > 1:
+            A /= (A.std())  # Unit variance
+        #  sum(grad(pi(a|s) * A))
+        #  minimize (1 - pi(a|s))
+        loss = torch.tensor([-log_prob * a for log_prob, a in zip(self.log_probs, A)],
                             requires_grad=True).sum()
 
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
-        if self.train_count % 100 == 0:
+        if self.train_count % 10 == 0:
             print(f"Train: {self.train_count} | loss: {loss.item():.6f}")
 
         self.rewards = []
