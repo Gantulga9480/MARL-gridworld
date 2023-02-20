@@ -32,7 +32,7 @@ eps_count = 0
 
 while env.running:
     eps_count += 1
-    s = env.reset((2, 1))
+    s = env.reset()
     rewards = []
     while not env.loop_once():
         a = agent.policy(s, greedy=True)
@@ -44,7 +44,5 @@ while env.running:
 
     scores.append(np.sum(rewards))
 
-data = [np.mean(scores[i:i + 10]) for i in range(0, len(scores), 5)]
-
-plt.plot(data)
+plt.plot(scores)
 plt.show()

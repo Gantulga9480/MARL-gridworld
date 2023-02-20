@@ -33,8 +33,8 @@ TERMINATE = 3
 # Rewards
 REWARDS = [
     0,   # Empty move
-    -0.2,   # Stayed inplace
-    -1,  # Fell through hole or time expired
+    0,   # Stayed inplace
+    -1,   # Fell through hole or time expired
     1    # Found goal
 ]
 
@@ -94,6 +94,7 @@ class GridEnv(Game):
 
     def reset(self, pos=None):
         self.over = False
+        self.step_count = 0
         if pos:
             y = pos[0]
             x = pos[1]

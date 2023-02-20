@@ -29,7 +29,6 @@ MAX_REPLAY_BUFFER = 1000
 BATCH_SIZE = 256
 TARGET_NET_UPDATE_FREQ = 5
 MAIN_NET_TRAIN_FREQ = 1
-CURRENT_TRAIN_ID = '2023-02-13'
 
 env = GridEnv(env_file="boards/board4.csv")
 agent = DQNAgent(env.observation_size, env.action_space_size, device="cuda:0")
@@ -72,7 +71,7 @@ while env.running:
 
         rewards.append(r)
     scores.append(np.sum(rewards))
-    if agent.episode_count >= 1000:
+    if agent.train_count >= 1000:
         env.running = False
 
 agent.save_model("model_dqn.pt")
