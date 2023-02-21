@@ -80,6 +80,8 @@ class DQNAgent(Agent):
                 return torch.argmax(self.model(state), axis=1).tolist()
 
     def learn(self, state, action, next_state, reward, episode_over):
+        if episode_over:
+            self.episode_count += 1
         batch = len(np.array(state).shape) > 1
         if not batch:
             self.buffer.push([state, action, next_state, reward, episode_over])
@@ -124,4 +126,4 @@ class DQNAgent(Agent):
         loss.backward()
         self.optimizer.step()
         if self.train_count % 100 == 0:
-            print(f"Train: {self.train_count} | loss: {loss.item():.6f} | e: {self.e:.6f}")
+            print(f"Episode: {self.episode_count} | Train: {self.train_count} | Loss: {loss.item():.6f} | e: {self.e:.6f}")

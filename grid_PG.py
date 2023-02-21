@@ -1,8 +1,8 @@
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.distributions import Categorical
 from grid import GridEnv
 from RL.pg_test import PGAgent
+import matplotlib.pyplot as plt
 
 
 class PG(nn.Module):
@@ -10,19 +10,18 @@ class PG(nn.Module):
     def __init__(self, observation_size, action_size):
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(observation_size, 512),
-            nn.ReLU(),
-            nn.Linear(512, 256),
-            nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Linear(128, action_size),
+            nn.Linear(observation_size, 64),
+            nn.LeakyReLU(),
+            nn.Linear(64, 32),
+            nn.LeakyReLU(),
+            nn.Linear(32, 16),
+            nn.LeakyReLU(),
+            nn.Linear(16, action_size),
             nn.Softmax(dim=0)
         )
 
-    def forward(self, x):
-        x = self.model(x)
-        print(x)
+    def forward(self, state):
+        x = self.model(state)
         m = Categorical(x)
         action = m.sample()
         return action.item(), m.log_prob(action)
@@ -30,19 +29,21 @@ class PG(nn.Module):
 
 env = GridEnv(env_file="boards/board4.csv")
 agent = PGAgent(env.observation_size, env.action_space_size, device="cuda:0")
-agent.create_model(PG, lr=0.001, y=0.99)
+agent.create_model(PG, lr=0.00025, y=0.99)
 
-rewards = []
+scores = []
 
 while env.running:
     s = env.reset()
-    ep_r = []
+    rewards = []
     while not env.loop_once():
         a = agent.policy(s)
         s, r, d = env.step(a)
         agent.learn(r, d)
-        ep_r.append(r)
-    rewards.append(sum(ep_r))
+        rewards.append(r)
+    scores.append(sum(rewards))
+    if agent.train_count >= 1000:
+        env.running = False
 
-with open('reward.txt', 'w') as f:
-    f.write('\n'.join([str(item) for item in rewards]))
+plt.plot(scores)
+plt.show()

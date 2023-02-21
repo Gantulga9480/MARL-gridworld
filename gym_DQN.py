@@ -10,11 +10,11 @@ class DQN(nn.Module):
         super().__init__()
         self.model = nn.Sequential(
             nn.Linear(observation_size, 512),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(512, 256),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(256, 128),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(128, action_size)
         )
 
@@ -27,9 +27,9 @@ BATCH_SIZE = 64
 TARGET_NET_UPDATE_FREQ = 5
 MAIN_NET_TRAIN_FREQ = 1
 
-env = gym.make("CartPole-v1", render_mode="human")
-agent = DQNAgent(4, 2, device="cuda:0", seed=42)
-agent.create_model(DQN, lr=0.00025, y=0.99, e_decay=0.9975, batchs=BATCH_SIZE, main_train_freq=MAIN_NET_TRAIN_FREQ, target_update_freq=TARGET_NET_UPDATE_FREQ)
+env = gym.make("MountainCar-v0", render_mode="human")
+agent = DQNAgent(2, 3, device="cuda:0", seed=42)
+agent.create_model(DQN, lr=0.00025, y=0.99, e_decay=0.999, batchs=BATCH_SIZE, main_train_freq=MAIN_NET_TRAIN_FREQ, target_update_freq=TARGET_NET_UPDATE_FREQ)
 agent.create_buffer(ReplayBuffer(MAX_REPLAY_BUFFER, 1000))
 
 
@@ -38,7 +38,7 @@ done = False
 while True:
     a = agent.policy(s)
     ns, r, d, f, i = env.step(a)
-    agent.learn(s, a, ns, r, d)
+    agent.learn(s, a, ns, r, d or f)
     s = ns
-    if d:
+    if d or f:
         s, info = env.reset()

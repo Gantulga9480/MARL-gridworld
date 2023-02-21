@@ -23,7 +23,7 @@ class DQN(nn.Module):
         return self.model(x)
 
 
-env = GridEnv(env_file="boards/board4.csv")
+env = GridEnv(env_file="boards/board2.csv")
 agent = DQNAgent(env.observation_size, env.action_space_size)
 agent.create_model(DQN)
 agent.load_model('model_dqn.pt')
