@@ -48,7 +48,7 @@ class PGAgent(Agent):
     def learn(self, reward, episode_over):
         if self.train:
             self.rewards.append(reward)
-            if episode_over and self.train:
+            if episode_over:
                 self.episode_count += 1
                 self.update_model()
 
@@ -60,10 +60,9 @@ class PGAgent(Agent):
             r_sum = r_sum * self.y + r
             G.append(r_sum)
         G = torch.tensor(list(reversed(G)))
-        A = G - G.mean()  # Advantage (G - Baseline)
+        A = G - G.mean()  # Advantage (G - Baseline) zero mean
         if len(A) > 1:
             A /= (A.std())  # Unit variance
-        print(A)
         #  sum(grad(pi(a|s) * A))
         #  minimize (1 - pi(a|s))
         loss = torch.tensor([-log_prob * a for log_prob, a in zip(self.log_probs, A)], requires_grad=True).sum()
@@ -72,7 +71,8 @@ class PGAgent(Agent):
         loss.backward()
         self.optimizer.step()
 
-        print(f"Episode: {self.episode_count} | Train: {self.train_count} | loss: {loss.item():.6f}")
+        if self.train_count % 100 == 0:
+            print(f"Episode: {self.episode_count} | Train: {self.train_count} | loss: {loss.item():.6f}")
 
         self.rewards = []
         self.log_probs = []

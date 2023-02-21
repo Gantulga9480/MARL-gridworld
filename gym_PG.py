@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 from torch.distributions import Categorical
 from RL.pg_test import PGAgent
@@ -6,14 +5,20 @@ import gym
 import matplotlib.pyplot as plt
 
 
-class PG(torch.nn.Module):
+class PG(nn.Module):
 
     def __init__(self, observation_size, action_size):
         super().__init__()
-        self.model = torch.nn.Sequential(
-            nn.Linear(observation_size, 16),
+        self.model = nn.Sequential(
+            nn.Linear(observation_size, 512),
             nn.LeakyReLU(),
-            nn.Linear(16, action_size),
+            nn.Linear(512, 256),
+            nn.LeakyReLU(),
+            nn.Linear(256, 128),
+            nn.LeakyReLU(),
+            nn.Linear(128, 64),
+            nn.LeakyReLU(),
+            nn.Linear(64, action_size),
             nn.Softmax(dim=0)
         )
 
@@ -24,31 +29,34 @@ class PG(torch.nn.Module):
         return action.item(), m.log_prob(action)
 
 
-env = gym.make("CartPole-v1")
+ENV_NAME = "CartPole-v1"
+env = gym.make(ENV_NAME, render_mode=None)
 agent = PGAgent(4, 2, device="cuda:0", seed=42)
-agent.create_model(PG, lr=0.01, y=1)
+agent.create_model(PG, lr=0.00025, y=0.99)
 scores = []
-reward = []
-s, i = env.reset(seed=42)
+
 while agent.episode_count < 3000:
-    a = agent.policy(s)
-    s, r, d, f, i = env.step(a)
-    reward.append(r)
-    agent.learn(r, d or f)
-    if d or f:
-        scores.append(sum(reward))
-        reward = []
-        s, info = env.reset()
+    reward = []
+    done = False
+    s, i = env.reset(seed=42)
+    while not done:
+        a = agent.policy(s)
+        s, r, d, t, i = env.step(a)
+        done = d or t
+        agent.learn(r, done)
+        reward.append(r)
+    scores.append(sum(reward))
 env.close()
 
 plt.plot(scores)
 plt.show()
 
-env = gym.make("CartPole-v1", render_mode="human")
-s, i = env.reset(seed=42)
-for _ in range(1000):
-    a = agent.policy(s)
-    s, r, d, f, i = env.step(a)
-    if d or f:
-        s, info = env.reset()
+env = gym.make(ENV_NAME, render_mode="human")
+for _ in range(10):
+    done = False
+    s, i = env.reset(seed=42)
+    while not done:
+        a = agent.policy(s)
+        s, r, d, t, i = env.step(a)
+        done = d or t
 env.close()
