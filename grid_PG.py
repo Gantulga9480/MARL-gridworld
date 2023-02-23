@@ -1,7 +1,7 @@
 import torch.nn as nn
 from torch.distributions import Categorical
 from grid import GridEnv
-from RL.pg_test import PGAgent
+from RL.reinforce import ReinforceAgent
 import matplotlib.pyplot as plt
 
 
@@ -28,7 +28,7 @@ class PG(nn.Module):
 
 
 env = GridEnv(env_file="boards/board4.csv")
-agent = PGAgent(env.observation_size, env.action_space_size, device="cuda:0")
+agent = ReinforceAgent(env.observation_size, env.action_space_size, device="cuda:0")
 agent.create_model(PG, lr=0.00025, y=0.99)
 
 scores = []

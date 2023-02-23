@@ -1,17 +1,19 @@
 import torch
 import os
 from .agent import Agent
+import numpy as np
 
 
-class PGAgent(Agent):
+class ReinforceAgent(Agent):
 
     def __init__(self, state_space_size: int, action_space_size: int, device: str = 'cpu', seed: int = 1) -> None:
-        super(PGAgent, self).__init__(state_space_size, action_space_size)
+        super(ReinforceAgent, self).__init__(state_space_size, action_space_size)
         torch.manual_seed(seed)
         self.model = None
         self.device = device
         self.log_probs = []
         self.rewards = []
+        self.eps = np.finfo(np.float32).eps.item()
 
     def create_model(self, model: torch.nn.Module, lr: float, y: float):
         self.lr = lr
@@ -62,7 +64,7 @@ class PGAgent(Agent):
         G = torch.tensor(list(reversed(G)))
         A = G - G.mean()  # Advantage (G - Baseline) zero mean
         if len(A) > 1:
-            A /= (A.std())  # Unit variance
+            A /= (A.std() + self.eps)  # Unit variance
         #  sum(grad(pi(a|s) * A))
         #  minimize (1 - pi(a|s))
         loss = torch.tensor([-log_prob * a for log_prob, a in zip(self.log_probs, A)], requires_grad=True).sum()

@@ -1,6 +1,6 @@
 import torch.nn as nn
 from torch.distributions import Categorical
-from RL.pg_test import PGAgent
+from RL.reinforce import ReinforceAgent
 import gym
 import matplotlib.pyplot as plt
 
@@ -31,7 +31,7 @@ class PG(nn.Module):
 
 ENV_NAME = "CartPole-v1"
 env = gym.make(ENV_NAME, render_mode=None)
-agent = PGAgent(4, 2, device="cuda:0", seed=42)
+agent = ReinforceAgent(4, 2, device="cuda:0", seed=42)
 agent.create_model(PG, lr=0.00025, y=0.99)
 scores = []
 
