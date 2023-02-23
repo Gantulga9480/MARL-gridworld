@@ -1,6 +1,7 @@
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.distributions import Categorical
-from RL.reinforce import ReinforceAgent
+from RL.actor_critic import ActorCriticAgent
 import gym
 import matplotlib.pyplot as plt
 
@@ -9,31 +10,33 @@ class PG(nn.Module):
 
     def __init__(self, observation_size, action_size):
         super().__init__()
-        self.model = nn.Sequential(
-            nn.Linear(observation_size, 512),
-            nn.LeakyReLU(),
-            nn.Linear(512, 256),
-            nn.LeakyReLU(),
-            nn.Linear(256, 128),
-            nn.LeakyReLU(),
-            nn.Linear(128, action_size),
-            nn.Softmax(dim=0)
-        )
+        self.fc_input = nn.Linear(observation_size, 512)
+        self.fc_hidden1 = nn.Linear(512, 256)
+        self.fc_hidden2 = nn.Linear(256, 128)
+
+        self.actor = nn.Linear(128, action_size)
+        self.critic = nn.Linear(128, 1)
 
     def forward(self, x):
-        x = self.model(x)
-        m = Categorical(x)
-        action = m.sample()
-        return action.item(), m.log_prob(action)
+        x = F.leaky_relu(self.fc_input(x))
+        x = F.leaky_relu(self.fc_hidden1(x))
+        x = F.leaky_relu(self.fc_hidden2(x))
+
+        probs = F.softmax(self.actor(x), dim=0)
+        value = self.critic(x)
+
+        distribution = Categorical(probs)
+        action = distribution.sample()
+        return action.item(), distribution.log_prob(action), value
 
 
-ENV_NAME = "LunarLander-v2"
+ENV_NAME = "CartPole-v1"
 env = gym.make(ENV_NAME, render_mode=None)
-agent = ReinforceAgent(8, 4, device="cuda:0", seed=42)
+agent = ActorCriticAgent(4, 2, device="cuda:0", seed=42)
 agent.create_model(PG, lr=0.00025, y=0.99)
 scores = []
 
-while agent.episode_count < 2000:
+while agent.episode_count < 1000:
     reward = []
     done = False
     s, i = env.reset(seed=42)

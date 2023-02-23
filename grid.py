@@ -76,7 +76,7 @@ class GridEnv(Game):
             self.initial_goal_location = [0, 4]
         shape = self.initial_board.shape
         self.size = (shape[1] * self.box_size, shape[0] * self.box_size)
-        self.max_step = (shape[1] - 1) * (shape[0] - 1)
+        self.max_step = (shape[1]) * (shape[0])
         self.set_window()
         self.reset()
 
@@ -111,9 +111,11 @@ class GridEnv(Game):
                     self.agent_location = [y, x]
                     break
         self.board = copy.deepcopy(self.initial_board)
+        self.board[self.agent_location[0], self.agent_location[1]] = A
         return self.get_state()
 
     def step(self, action):
+        self.step_count += 1
         res = self._check_action(action)
         # Valid move
         if res != INPLACE:
@@ -131,8 +133,8 @@ class GridEnv(Game):
         down = self.board[self.agent_location[0] + 1, self.agent_location[1]]
         left = self.board[self.agent_location[0], self.agent_location[1] - 1]
         right = self.board[self.agent_location[0], self.agent_location[1] + 1]
-        x = self.agent_location[0]
-        y = self.agent_location[1]
+        y = self.agent_location[0]
+        x = self.agent_location[1]
         return (x, y, up, down, right, left)
         # return self.board.flatten().tolist()
 
@@ -204,7 +206,6 @@ class GridEnv(Game):
                            (self.size[0] - 1, self.box_size * i))
 
     def _check_action(self, action):
-        self.step_count += 1
         agent_location_tmp = self.agent_location.copy()
         if action == UP:
             agent_location_tmp[0] -= 1
