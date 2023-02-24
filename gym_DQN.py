@@ -1,6 +1,8 @@
-from RL.dqn import DQNAgent
+from RL.dqn import DeepQNetworkAgent
 from RL.utils import ReplayBuffer
+import torch
 import torch.nn as nn
+import numpy as np
 import gym
 import matplotlib.pyplot as plt
 
@@ -25,22 +27,25 @@ class DQN(nn.Module):
         return self.model(x)
 
 
+torch.manual_seed(3407)
+np.random.seed(3407)
+
 MAX_REPLAY_BUFFER = 100000
 BATCH_SIZE = 64
 TARGET_NET_UPDATE_FREQ = 5
 MAIN_NET_TRAIN_FREQ = 1
 ENV_NAME = "CartPole-v1"
 
-env = gym.make(ENV_NAME)
-agent = DQNAgent(4, 2, device="cuda:0", seed=42)
+env = gym.make(ENV_NAME, render_mode=None)
+agent = DeepQNetworkAgent(4, 2, device="cuda:0")
 agent.create_model(DQN, lr=0.00025, y=0.99, e_decay=0.999, batchs=BATCH_SIZE, main_train_freq=MAIN_NET_TRAIN_FREQ, target_update_freq=TARGET_NET_UPDATE_FREQ)
-agent.create_buffer(ReplayBuffer(MAX_REPLAY_BUFFER, 1000))
+agent.create_buffer(ReplayBuffer(MAX_REPLAY_BUFFER, 1000, 4))
 
 scores = []
 while agent.episode_count < 100:
     reward = []
     done = False
-    s, info = env.reset(seed=42)
+    s, info = env.reset(seed=3407)
     while not done:
         a = agent.policy(s)
         ns, r, d, t, i = env.step(a)
@@ -48,7 +53,8 @@ while agent.episode_count < 100:
         agent.learn(s, a, ns, r, done)
         s = ns
         reward.append(r)
-    scores.append(sum(reward))
+    r_sum = sum(reward)
+    scores.append(r_sum)
 env.close()
 
 plt.plot(scores)

@@ -135,8 +135,7 @@ class GridEnv(Game):
         right = self.board[self.agent_location[0], self.agent_location[1] + 1]
         y = self.agent_location[0]
         x = self.agent_location[1]
-        return (x, y, up, down, right, left)
-        # return self.board.flatten().tolist()
+        return np.array([x, y, up, down, right, left])
 
     def get_state_q(self):
         return tuple(self.agent_location.copy())
