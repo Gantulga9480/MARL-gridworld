@@ -33,7 +33,7 @@ class ReinforceAgent(DeepAgent):
         for r in reversed(self.rewards):
             r_sum = r_sum * self.y + r
             G.append(r_sum)
-        G = torch.tensor(list(reversed(G)))
+        G = torch.tensor(list(reversed(G)), dtype=torch.float32)
         A = G - G.mean()
         if len(A) > 1:
             A /= (A.std() + self.eps)
