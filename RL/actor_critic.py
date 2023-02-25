@@ -1,29 +1,16 @@
 import torch
-import os
-from .agent import Agent
+from .deep_agent import DeepAgent
 import numpy as np
 
 
-class ActorCriticAgent(Agent):
+class ActorCriticAgent(DeepAgent):
 
-    def __init__(self, state_space_size: int, action_space_size: int, device: str = 'cpu', seed: int = 1) -> None:
-        super(ActorCriticAgent, self).__init__(state_space_size, action_space_size)
-        torch.manual_seed(seed)
-        self.device = device
-        self.model = None
+    def __init__(self, state_space_size: int, action_space_size: int, device: str = 'cpu') -> None:
+        super().__init__(state_space_size, action_space_size, device)
         self.log_probs = []
         self.rewards = []
         self.values = []
         self.eps = np.finfo(np.float32).eps.item()
-        self.loss = None
-
-    def create_model(self, model: torch.nn.Module, lr: float, y: float):
-        self.lr = lr
-        self.y = y
-        self.model = model(self.state_space_size, self.action_space_size)
-        self.model.to(self.device)
-        self.model.train()
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
         self.loss_fn = torch.nn.HuberLoss()
 
     def policy(self, state):
@@ -56,15 +43,16 @@ class ActorCriticAgent(Agent):
 
         V = torch.cat(self.values)
 
-        A = G - V
+        with torch.no_grad():
+            A = G - V
 
         actor_loss = torch.stack([-log_prob * a for log_prob, a in zip(self.log_probs, A)]).sum()
         critic_loss = self.loss_fn(V, G)
 
-        self.loss = actor_loss + critic_loss
+        loss = actor_loss + critic_loss
 
         self.optimizer.zero_grad()
-        self.loss.backward()
+        loss.backward()
         self.optimizer.step()
 
         if self.train_count % 100 == 0:
@@ -73,20 +61,3 @@ class ActorCriticAgent(Agent):
         self.rewards = []
         self.log_probs = []
         self.values = []
-
-    def save_model(self, path: str) -> None:
-        if self.model and path:
-            try:
-                torch.save(self.model.state_dict(), path)
-            except Exception:
-                os.makedirs("/".join(path.split("/")[:-1]))
-                torch.save(self.model.state_dict(), path)
-
-    def load_model(self, path) -> None:
-        try:
-            self.model.load_state_dict(torch.load(path))
-            self.model.to(self.device)
-            self.model.train()
-        except Exception:
-            print(f'{path} file not found!')
-            exit()

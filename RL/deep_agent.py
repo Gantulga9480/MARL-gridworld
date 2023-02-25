@@ -9,6 +9,8 @@ class DeepAgent(Agent):
         super().__init__(state_space_size, action_space_size)
         self.model = None
         self.device = device
+        self.optimizer = None
+        self.loss_fn = None
 
     def create_model(self, model: torch.nn.Module, lr: float, y: float):
         self.lr = lr

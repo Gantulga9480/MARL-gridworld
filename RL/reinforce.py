@@ -34,11 +34,10 @@ class ReinforceAgent(DeepAgent):
             r_sum = r_sum * self.y + r
             G.append(r_sum)
         G = torch.tensor(list(reversed(G)))
-        A = G - G.mean()  # Advantage (G - Baseline) zero mean
+        A = G - G.mean()
         if len(A) > 1:
-            A /= (A.std() + self.eps)  # Unit variance
-        #  sum(grad(pi(a|s) * A))
-        #  minimize (1 - pi(a|s))
+            A /= (A.std() + self.eps)
+
         loss = torch.stack([-log_prob * a for log_prob, a in zip(self.log_probs, A)]).sum()
 
         self.optimizer.zero_grad()
