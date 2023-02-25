@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from torch.distributions import Categorical
 from RL.reinforce import ReinforceAgent
@@ -27,16 +28,17 @@ class PG(nn.Module):
         return action.item(), m.log_prob(action)
 
 
-ENV_NAME = "LunarLander-v2"
+torch.manual_seed(3407)
+ENV_NAME = "CartPole-v1"
 env = gym.make(ENV_NAME, render_mode=None)
-agent = ReinforceAgent(8, 4, device="cuda:0", seed=42)
+agent = ReinforceAgent(4, 2, device="cuda:0")
 agent.create_model(PG, lr=0.00025, y=0.99)
 scores = []
 
-while agent.episode_count < 2000:
+while agent.episode_count < 930:
     reward = []
     done = False
-    s, i = env.reset(seed=42)
+    s, i = env.reset(seed=3407)
     while not done:
         a = agent.policy(s)
         s, r, d, t, i = env.step(a)
