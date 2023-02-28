@@ -66,7 +66,7 @@ plt.show()
 env = gym.make(ENV_NAME, render_mode="human")
 for _ in range(10):
     done = False
-    s, i = env.reset(seed=42)
+    s, i = env.reset(seed=3407)
     while not done:
         a = agent.policy(s)
         s, r, d, t, i = env.step(a)
