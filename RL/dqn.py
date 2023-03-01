@@ -13,7 +13,7 @@ class DeepQNetworkAgent(DeepAgent):
         self.batchs = 0
         self.target_update_freq = 0
         self.target_update_rate = 0
-        self.loss_fn = None
+        self.loss_fn = torch.nn.HuberLoss()
 
     def create_buffer(self, buffer: ReplayBufferBase):
         if buffer.min_size == 0:
@@ -30,7 +30,6 @@ class DeepQNetworkAgent(DeepAgent):
         self.batchs = batchs
         self.target_update_freq = target_update_freq
         self.target_update_rate = tau
-        self.loss_fn = torch.nn.MSELoss()
 
     def load_model(self, path) -> None:
         super().load_model(path)
@@ -93,11 +92,8 @@ class DeepQNetworkAgent(DeepAgent):
             current_qs = self.model(states)
             future_qs = self.target_model(next_states)
             for i in range(len(s)):
-                if not d[i]:
-                    new_q = r[i] + self.y * torch.max(future_qs[i])
-                else:
-                    new_q = r[i]
-                current_qs[i][a[i]] = new_q.item()
+                current_qs[i][a[i]] = (r[i] + (1 - d[i]) * self.y * torch.max(future_qs[i])).item()
+
         self.model.train()
         preds = self.model(states)
         loss = self.loss_fn(preds, current_qs).to(self.device)

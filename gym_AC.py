@@ -1,10 +1,11 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.distributions import Categorical
 from RL.actor_critic import ActorCriticAgent
 import gym
 import matplotlib.pyplot as plt
+torch.manual_seed(3407)
+torch.cuda.manual_seed(3407)
 
 
 class AC(nn.Module):
@@ -24,11 +25,7 @@ class AC(nn.Module):
         self.critic = nn.Sequential(
             nn.Linear(observation_size, 512),
             nn.LeakyReLU(),
-            nn.Linear(512, 256),
-            nn.LeakyReLU(),
-            nn.Linear(256, 128),
-            nn.LeakyReLU(),
-            nn.Linear(128, 1)
+            nn.Linear(512, 1)
         )
 
     def forward(self, x):
@@ -40,11 +37,10 @@ class AC(nn.Module):
         return action.item(), distribution.log_prob(action), value
 
 
-torch.manual_seed(3407)
-ENV_NAME = "LunarLander-v2"
+ENV_NAME = "CartPole-v1"
 env = gym.make(ENV_NAME, render_mode=None)
-agent = ActorCriticAgent(8, 4, device="cuda:0")
-agent.create_model(AC, lr=0.00025, y=0.99)
+agent = ActorCriticAgent(4, 2, device="cuda:0")
+agent.create_model(AC, lr=0.0001, y=0.99)
 scores = []
 
 while agent.episode_count < 1000:

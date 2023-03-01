@@ -4,6 +4,8 @@ from torch.distributions import Categorical
 from RL.reinforce import ReinforceAgent
 import gym
 import matplotlib.pyplot as plt
+torch.manual_seed(3407)
+torch.cuda.manual_seed(3407)
 
 
 class PG(nn.Module):
@@ -28,14 +30,13 @@ class PG(nn.Module):
         return action.item(), m.log_prob(action)
 
 
-torch.manual_seed(3407)
 ENV_NAME = "CartPole-v1"
 env = gym.make(ENV_NAME, render_mode=None)
 agent = ReinforceAgent(4, 2, device="cuda:0")
-agent.create_model(PG, lr=0.00025, y=0.99)
+agent.create_model(PG, lr=0.0001, y=0.99)
 scores = []
 
-while agent.episode_count < 930:
+while agent.episode_count < 1000:
     reward = []
     done = False
     s, i = env.reset(seed=3407)

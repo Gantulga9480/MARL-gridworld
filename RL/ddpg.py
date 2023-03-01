@@ -1,11 +1,10 @@
-import os
 import torch
 import numpy as np
 from .deep_agent import DeepAgent
 from .utils import ReplayBufferBase
 
 
-class DDPGAgent(DeepAgent):
+class DeepDeterministicPolicyGradientAgent(DeepAgent):
 
     def __init__(self, state_space_size: int, action_space_size: int, device: str = 'cpu') -> None:
         super().__init__(state_space_size, action_space_size, device)
@@ -24,9 +23,10 @@ class DDPGAgent(DeepAgent):
             buffer.min_size = self.batchs
         self.buffer = buffer
 
-    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, lr: float, y: float, batch: int = 64, tau: float = 0.001):
+    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, lr: float, y: float, e_decay: float = 0.999999, batch: int = 64, tau: float = 0.001):
         self.lr = lr
         self.y = y
+        self.e_decay = e_decay
         self.batchs = batch
         self.target_update_rate = tau
         self.actor = actor(self.state_space_size, self.action_space_size)
@@ -76,16 +76,13 @@ class DDPGAgent(DeepAgent):
         self.train_count += 1
         self.critic.eval()
         states = torch.tensor(s, dtype=torch.float32).to(self.device)
+        actions = torch.tensor(a, dtype=torch.float32).to(self.device)
         next_states = torch.tensor(ns, dtype=torch.float32).to(self.device)
         with torch.no_grad():
-            current_qs = self.critic(states)
+            current_qs = self.critic(states, actions)
             future_qs = self.target_critic(next_states)
             for i in range(len(s)):
-                if not d[i]:
-                    new_q = r[i] + self.y * torch.max(future_qs[i])
-                else:
-                    new_q = r[i]
-                current_qs[i][a[i]] = new_q.item()
+                current_qs[i][a[i]] = (r[i] + (1 - d[i]) * self.y * torch.max(future_qs[i])).item()
 
         self.critic.train()
         preds = self.critic(states)
