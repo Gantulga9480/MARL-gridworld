@@ -44,8 +44,7 @@ class ReinforceAgent(DeepAgent):
         loss.backward()
         self.optimizer.step()
 
-        if self.train_count % 100 == 0:
-            print(f"Episode: {self.episode_count} | Train: {self.train_count} | loss: {loss.item():.6f}")
+        print(f"Episode: {self.episode_count} | Train: {self.train_count} | loss: {loss.item():.6f}")
 
         self.rewards = []
         self.log_probs = []

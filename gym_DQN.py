@@ -30,7 +30,7 @@ class DQN(nn.Module):
 torch.manual_seed(3407)
 np.random.seed(3407)
 
-MAX_REPLAY_BUFFER = 100000
+MAX_REPLAY_BUFFER = 1_000_000
 BATCH_SIZE = 64
 TARGET_NET_UPDATE_FREQ = 5
 MAIN_NET_TRAIN_FREQ = 1
@@ -38,11 +38,11 @@ ENV_NAME = "CartPole-v1"
 
 env = gym.make(ENV_NAME, render_mode=None)
 agent = DeepQNetworkAgent(4, 2, device="cuda:0")
-agent.create_model(DQN, lr=0.00025, y=0.99, e_decay=0.999, batchs=BATCH_SIZE, main_train_freq=MAIN_NET_TRAIN_FREQ, target_update_freq=TARGET_NET_UPDATE_FREQ)
-agent.create_buffer(ReplayBuffer(MAX_REPLAY_BUFFER, 1000, 4))
+agent.create_model(DQN, lr=0.0003, y=0.99, e_decay=0.999, batchs=BATCH_SIZE, target_update_freq=TARGET_NET_UPDATE_FREQ, tau=0.01)
+agent.create_buffer(ReplayBuffer(MAX_REPLAY_BUFFER, BATCH_SIZE, 4))
 
 scores = []
-while agent.episode_count < 100:
+while agent.episode_count < 200:
     reward = []
     done = False
     s, info = env.reset(seed=3407)
@@ -50,7 +50,7 @@ while agent.episode_count < 100:
         a = agent.policy(s)
         ns, r, d, t, i = env.step(a)
         done = d or t
-        agent.learn(s, a, ns, r, done)
+        agent.learn(s, a, ns, r, done, update="soft")
         s = ns
         reward.append(r)
     r_sum = sum(reward)

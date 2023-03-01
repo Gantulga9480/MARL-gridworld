@@ -11,8 +11,8 @@ class DeepQNetworkAgent(DeepAgent):
         self.target_model = None
         self.buffer = None
         self.batchs = 0
-        self.main_train_freq = 0
         self.target_update_freq = 0
+        self.target_update_rate = 0
         self.loss_fn = None
 
     def create_buffer(self, buffer: ReplayBufferBase):
@@ -20,7 +20,7 @@ class DeepQNetworkAgent(DeepAgent):
             buffer.min_size = self.batchs
         self.buffer = buffer
 
-    def create_model(self, model: torch.nn.Module, lr: float, y: float, e_decay: float = 0.999999, batchs: int = 64, main_train_freq: int = 1, target_update_freq: int = 10):
+    def create_model(self, model: torch.nn.Module, lr: float, y: float, e_decay: float = 0.999999, batchs: int = 64, target_update_freq: int = 10, tau: float = 0.001):
         super().create_model(model, lr, y)
         self.target_model = model(self.state_space_size, self.action_space_size)
         self.target_model.load_state_dict(self.model.state_dict())
@@ -28,8 +28,8 @@ class DeepQNetworkAgent(DeepAgent):
         self.target_model.eval()
         self.e_decay = e_decay
         self.batchs = batchs
-        self.main_train_freq = main_train_freq
         self.target_update_freq = target_update_freq
+        self.target_update_rate = tau
         self.loss_fn = torch.nn.MSELoss()
 
     def load_model(self, path) -> None:
@@ -39,24 +39,25 @@ class DeepQNetworkAgent(DeepAgent):
         self.target_model.eval()
 
     @torch.no_grad()
-    def policy(self, state, greedy=False):
-        """greedy - False (default) for training, True for inference"""
+    def policy(self, state: np.ndarray):
+        """E_greedy - True for training, False (default) for inference"""
         self.step_count += 1
         self.model.eval()
         state = torch.tensor(state, dtype=torch.float32).to(self.device)
         is_batch = len(state.size()) > 1
         if not is_batch:
-            if not greedy and np.random.random() < self.e:
+            if self.train and np.random.random() < self.e:
                 return np.random.choice(list(range(self.action_space_size)))
             else:
                 return torch.argmax(self.model(state)).item()
         else:
-            if not greedy and np.random.random() < self.e:
+            if self.train and np.random.random() < self.e:
                 return [np.random.choice(list(range(self.action_space_size))) for _ in range(len(state))]
             else:
                 return torch.argmax(self.model(state), axis=1).tolist()
 
-    def learn(self, state, action, next_state, reward, episode_over):
+    def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool, update: str = "hard"):
+        """update: ['hard', 'soft'] = 'hard'"""
         if episode_over:
             self.episode_count += 1
         batch = len(state.shape) > 1
@@ -65,18 +66,22 @@ class DeepQNetworkAgent(DeepAgent):
         else:
             self.buffer.extend(state, action, next_state, reward, episode_over)
         if self.buffer.trainable and self.train:
-            if self.step_count % self.main_train_freq == 0:
-                self.update_model()
-            if self.train_count % self.target_update_freq == 0:
-                self.update_target()
+            self.update_model()
+            if update == "soft":
+                self.target_update_soft()
+            elif update == "hard":
+                if self.train_count % self.target_update_freq == 0:
+                    self.target_update_hard()
+            else:
+                raise ValueError(f"wrong target update mode -> {update}")
             self.decay_epsilon()
 
-    def update_target(self):
-        if self.model:
-            self.target_model.load_state_dict(self.model.state_dict())
-        else:
-            print('Model not created!')
-            exit()
+    def target_update_hard(self):
+        self.target_model.load_state_dict(self.model.state_dict())
+
+    def target_update_soft(self):
+        for target_param, local_param in zip(self.target_model.parameters(), self.model.parameters()):
+            target_param.data.copy_(self.target_update_rate * local_param.data + (1.0 - self.target_update_rate) * target_param.data)
 
     def update_model(self):
         s, a, ns, r, d = self.buffer.sample(self.batchs)

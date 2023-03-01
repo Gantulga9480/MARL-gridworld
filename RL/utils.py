@@ -38,7 +38,7 @@ class ReplayBuffer(ReplayBufferBase):
 
     @property
     def trainable(self):
-        return self.buffer_idx + 1 >= self.min_size or self.is_full
+        return self.buffer_idx >= self.min_size or self.is_full
 
     def push(self, state, action, next_state, reward, episode_over):
         """Data format [state, action, next_state, reward, episode_over]"""
