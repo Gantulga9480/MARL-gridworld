@@ -22,7 +22,7 @@ class ActorCriticAgent(DeepAgent):
             self.values.append(value)
         return action
 
-    def learn(self, reward, episode_over):
+    def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool):
         if self.train:
             self.rewards.append(reward)
             if episode_over:

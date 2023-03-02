@@ -41,23 +41,26 @@ ENV_NAME = "CartPole-v1"
 env = gym.make(ENV_NAME, render_mode=None)
 agent = ActorCriticAgent(4, 2, device="cuda:0")
 agent.create_model(AC, lr=0.0001, y=0.99)
-scores = []
 
+scores = []
 while agent.episode_count < 1000:
     reward = []
     done = False
     s, i = env.reset(seed=3407)
     while not done:
         a = agent.policy(s)
-        s, r, d, t, i = env.step(a)
+        ns, r, d, t, i = env.step(a)
         done = d or t
-        agent.learn(r, done)
+        agent.learn(s, r, ns, r, done)
+        s = ns
         reward.append(r)
     scores.append(sum(reward))
 env.close()
 
 plt.plot(scores)
 plt.show()
+
+agent.train = False
 
 env = gym.make(ENV_NAME, render_mode="human")
 for _ in range(10):

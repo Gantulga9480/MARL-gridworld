@@ -2,4 +2,5 @@ pygame
 numpy
 matplotlib
 pytorch
-gym
+gym[box2d]
+gymnasium[mujoco]

@@ -55,8 +55,8 @@ class DeepQNetworkAgent(DeepAgent):
             else:
                 return torch.argmax(self.model(state), axis=1).tolist()
 
-    def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool, update: str = "hard"):
-        """update: ['hard', 'soft'] = 'hard'"""
+    def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool, update: str = "soft"):
+        """update: ['hard', 'soft'] = 'soft'"""
         if episode_over:
             self.episode_count += 1
         batch = len(state.shape) > 1

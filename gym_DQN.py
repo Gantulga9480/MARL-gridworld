@@ -29,7 +29,6 @@ class DQN(nn.Module):
 
 
 ENV_NAME = "CartPole-v1"
-
 env = gym.make(ENV_NAME, render_mode=None)
 agent = DeepQNetworkAgent(4, 2, device="cuda:0")
 agent.create_model(DQN, lr=0.0001, y=0.99, e_decay=0.9999, batchs=64, tau=0.01)
@@ -44,7 +43,7 @@ while agent.episode_count < 1000:
         a = agent.policy(s)
         ns, r, d, t, i = env.step(a)
         done = d or t
-        agent.learn(s, a, ns, r, done, update="soft")
+        agent.learn(s, a, ns, r, done)
         s = ns
         reward.append(r)
     r_sum = sum(reward)
@@ -54,10 +53,12 @@ env.close()
 plt.plot(scores)
 plt.show()
 
+agent.train = False
+
 env = gym.make(ENV_NAME, render_mode="human")
 for _ in range(10):
     done = False
-    s, i = env.reset(seed=42)
+    s, i = env.reset(seed=3407)
     while not done:
         a = agent.policy(s)
         s, r, d, t, i = env.step(a)
