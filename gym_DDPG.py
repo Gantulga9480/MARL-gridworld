@@ -58,19 +58,22 @@ agent.create_model(Actor, Critic, lr=0.0001, y=0.99, noise_std=0.1, batchs=64, t
 agent.create_buffer(ReplayBuffer(1_000_000, 1000, 4))
 
 scores = []
-while agent.episode_count < 5000:
-    reward = []
-    done = False
-    s, info = env.reset(seed=3407)
-    while not done:
-        a = agent.policy(s) * 3
-        ns, r, d, t, i = env.step(a)
-        done = d or t
-        agent.learn(s, a, ns, r, done)
-        s = ns
-        reward.append(r)
-    r_sum = sum(reward)
-    scores.append(r_sum)
+try:
+    while True:
+        reward = []
+        done = False
+        s, info = env.reset(seed=3407)
+        while not done:
+            a = agent.policy(s) * 3
+            ns, r, d, t, i = env.step(a)
+            done = d or t
+            agent.learn(s, a, ns, r, done)
+            s = ns
+            reward.append(r)
+        r_sum = sum(reward)
+        scores.append(r_sum)
+except KeyboardInterrupt:
+    pass
 env.close()
 
 plt.plot(scores)
