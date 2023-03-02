@@ -38,18 +38,24 @@ class Critic(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(observation_size + action_size, 1024),
             nn.LeakyReLU(),
-            nn.Linear(1024, 1)
+            nn.Linear(1024, 512),
+            nn.LeakyReLU(),
+            nn.Linear(512, 256),
+            nn.LeakyReLU(),
+            nn.Linear(256, 128),
+            nn.LeakyReLU(),
+            nn.Linear(128, 1)
         )
 
     def forward(self, state, action):
         return self.model(torch.cat([state, action], dim=1))
 
 
-ENV_NAME = "InvertedDoublePendulum-v4"
+ENV_NAME = "InvertedPendulum-v4"
 env = gym.make(ENV_NAME, render_mode=None)
-agent = DDPGAgent(11, 1, device="cuda:0")
-agent.create_model(Actor, Critic, lr=0.0003, y=0.99, noise_std=0.1, batchs=64, tau=0.01)
-agent.create_buffer(ReplayBuffer(1_000_000, 1000, 11))
+agent = DDPGAgent(4, 1, device="cuda:0")
+agent.create_model(Actor, Critic, lr=0.0001, y=0.99, noise_std=0.1, batchs=64, tau=0.01)
+agent.create_buffer(ReplayBuffer(1_000_000, 1000, 4))
 
 scores = []
 while agent.episode_count < 5000:
@@ -57,7 +63,7 @@ while agent.episode_count < 5000:
     done = False
     s, info = env.reset(seed=3407)
     while not done:
-        a = agent.policy(s)
+        a = agent.policy(s) * 3
         ns, r, d, t, i = env.step(a)
         done = d or t
         agent.learn(s, a, ns, r, done)

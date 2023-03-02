@@ -83,8 +83,8 @@ class DeepQNetworkAgent(DeepAgent):
             target_param.data.copy_(self.target_update_rate * local_param.data + (1.0 - self.target_update_rate) * target_param.data)
 
     def update_model(self):
-        s, a, ns, r, d = self.buffer.sample(self.batchs)
         self.train_count += 1
+        s, a, ns, r, d = self.buffer.sample(self.batchs)
         self.model.eval()
         states = torch.tensor(s, dtype=torch.float32).to(self.device)
         next_states = torch.tensor(ns, dtype=torch.float32).to(self.device)
