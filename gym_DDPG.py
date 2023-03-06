@@ -59,7 +59,7 @@ agent.create_buffer(ReplayBuffer(1_000_000, 1000, 4))
 
 scores = []
 try:
-    while True:
+    while agent.episode_count < 412:
         reward = []
         done = False
         s, info = env.reset(seed=3407)
@@ -72,6 +72,7 @@ try:
             reward.append(r)
         r_sum = sum(reward)
         scores.append(r_sum)
+        print(r_sum)
 except KeyboardInterrupt:
     pass
 env.close()

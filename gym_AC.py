@@ -43,18 +43,23 @@ agent = ActorCriticAgent(4, 2, device="cuda:0")
 agent.create_model(AC, lr=0.0001, y=0.99)
 
 scores = []
-while agent.episode_count < 1000:
-    reward = []
-    done = False
-    s, i = env.reset(seed=3407)
-    while not done:
-        a = agent.policy(s)
-        ns, r, d, t, i = env.step(a)
-        done = d or t
-        agent.learn(s, r, ns, r, done)
-        s = ns
-        reward.append(r)
-    scores.append(sum(reward))
+try:
+    while agent.episode_count < 421:
+        reward = []
+        done = False
+        s, i = env.reset(seed=3407)
+        while not done:
+            a = agent.policy(s)
+            ns, r, d, t, i = env.step(a)
+            done = d or t
+            agent.learn(s, r, ns, r, done)
+            s = ns
+            reward.append(r)
+        r_sum = sum(reward)
+        scores.append(r_sum)
+        print(r_sum)
+except KeyboardInterrupt:
+    pass
 env.close()
 
 plt.plot(scores)
