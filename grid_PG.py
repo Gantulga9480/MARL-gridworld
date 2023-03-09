@@ -10,7 +10,13 @@ class PG(nn.Module):
     def __init__(self, observation_size, action_size):
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(observation_size, 128),
+            nn.Linear(observation_size, 1024),
+            nn.LeakyReLU(),
+            nn.Linear(1024, 512),
+            nn.LeakyReLU(),
+            nn.Linear(512, 256),
+            nn.LeakyReLU(),
+            nn.Linear(256, 128),
             nn.LeakyReLU(),
             nn.Linear(128, 64),
             nn.LeakyReLU(),
@@ -27,23 +33,17 @@ class PG(nn.Module):
 
 env = GridEnv(env_file="boards/board3.csv")
 agent = ReinforceAgent(env.observation_size, env.action_space_size, device="cuda:0")
-agent.create_model(PG, lr=0.00025, y=0.99)
-
-scores = []
+agent.create_model(PG, lr=0.0001, y=0.99)
 
 while env.running:
     s = env.reset()
-    rewards = []
     while not env.loop_once():
         a = agent.policy(s)
-        s, r, d = env.step(a)
-        agent.learn(r, d)
-        rewards.append(r)
-    scores.append(sum(rewards))
-    if agent.train_count >= 5000:
-        env.running = False
+        ns, r, d = env.step(a)
+        agent.learn(s, a, ns, r, d)
+        s = ns
 
-plt.plot(scores)
+plt.plot(agent.reward_history)
 plt.show()
 
 env.running = True
@@ -57,6 +57,3 @@ while env.running:
         s, r, d = env.step(a)
         rewards.append(r)
     scores.append(sum(rewards))
-
-plt.plot(scores)
-plt.show()
