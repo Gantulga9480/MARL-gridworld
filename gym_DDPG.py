@@ -57,10 +57,8 @@ agent = DDPGAgent(4, 1, device="cuda:0")
 agent.create_model(Actor, Critic, lr=0.0001, y=0.99, noise_std=0.1, batchs=64, tau=0.01)
 agent.create_buffer(ReplayBuffer(1_000_000, 1000, 4))
 
-scores = []
 try:
-    while agent.episode_count < 412:
-        reward = []
+    while agent.episode_count < 1000:
         done = False
         s, info = env.reset(seed=3407)
         while not done:
@@ -69,15 +67,11 @@ try:
             done = d or t
             agent.learn(s, a, ns, r, done)
             s = ns
-            reward.append(r)
-        r_sum = sum(reward)
-        scores.append(r_sum)
-        print(r_sum)
 except KeyboardInterrupt:
     pass
 env.close()
 
-plt.plot(scores)
+plt.plot(agent.reward_history)
 plt.show()
 
 agent.train = False

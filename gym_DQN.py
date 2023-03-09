@@ -31,13 +31,11 @@ class DQN(nn.Module):
 ENV_NAME = "CartPole-v1"
 env = gym.make(ENV_NAME, render_mode=None)
 agent = DeepQNetworkAgent(4, 2, device="cuda:0")
-agent.create_model(DQN, lr=0.0001, y=0.99, e_decay=0.9999, batchs=64, tau=0.01)
+agent.create_model(DQN, lr=0.0001, y=0.99, e_decay=0.999, batchs=64, tau=0.01)
 agent.create_buffer(ReplayBuffer(1_000_000, 1000, 4))
 
-scores = []
 try:
     while True:
-        reward = []
         done = False
         s, info = env.reset(seed=3407)
         while not done:
@@ -46,15 +44,11 @@ try:
             done = d or t
             agent.learn(s, a, ns, r, done)
             s = ns
-            reward.append(r)
-        r_sum = sum(reward)
-        scores.append(r_sum)
-        print(r_sum)
 except KeyboardInterrupt:
     pass
 env.close()
 
-plt.plot(scores)
+plt.plot(agent.reward_history)
 plt.show()
 
 agent.train = False
