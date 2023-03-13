@@ -32,10 +32,10 @@ TERMINATE = 3
 
 # Rewards
 REWARDS = [
-    0,   # Empty move
-    0,   # Stayed inplace
+    -1,   # Empty move
+    -1,   # Stayed inplace
     -1,   # Fell through hole or time expired
-    1    # Found goal
+    300    # Found goal
 ]
 
 EPISODE_TERMINATING_POLICY = [
@@ -129,12 +129,12 @@ class GridEnv(Game):
         return self.get_state_dqn()
 
     def get_state_dqn(self):
-        up = self.board[self.agent_location[0] - 1, self.agent_location[1]]
-        down = self.board[self.agent_location[0] + 1, self.agent_location[1]]
-        left = self.board[self.agent_location[0], self.agent_location[1] - 1]
-        right = self.board[self.agent_location[0], self.agent_location[1] + 1]
-        y = self.agent_location[0]
-        x = self.agent_location[1]
+        up = self.board[self.agent_location[0] - 1, self.agent_location[1]] / 4
+        down = self.board[self.agent_location[0] + 1, self.agent_location[1]] / 4
+        left = self.board[self.agent_location[0], self.agent_location[1] - 1] / 4
+        right = self.board[self.agent_location[0], self.agent_location[1] + 1] / 4
+        y = self.agent_location[0] / self.initial_board.shape[0]
+        x = self.agent_location[1] / self.initial_board.shape[1]
         return np.array([x, y, up, down, right, left])
 
     def get_state_q(self):
