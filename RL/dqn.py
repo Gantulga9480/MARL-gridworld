@@ -13,6 +13,8 @@ class DeepQNetworkAgent(DeepAgent):
         self.batchs = 0
         self.target_update_freq = 0
         self.target_update_rate = 0
+        self.target_update_method = "soft"
+        self.target_update_fn = self.target_update_soft
         self.loss_fn = torch.nn.HuberLoss()
 
     def create_buffer(self, buffer: ReplayBufferBase):
@@ -20,7 +22,7 @@ class DeepQNetworkAgent(DeepAgent):
             buffer.min_size = self.batchs
         self.buffer = buffer
 
-    def create_model(self, model: torch.nn.Module, lr: float, y: float, e_decay: float = 0.999999, batchs: int = 64, target_update_freq: int = 10, tau: float = 0.001):
+    def create_model(self, model: torch.nn.Module, lr: float, y: float, e_decay: float = 0.999999, batchs: int = 64, target_update_method: str = "soft", tuf: int = 10, tau: float = 0.001):
         super().create_model(model, lr, y)
         self.target_model = model(self.state_space_size, self.action_space_size)
         self.target_model.load_state_dict(self.model.state_dict())
@@ -28,8 +30,11 @@ class DeepQNetworkAgent(DeepAgent):
         self.target_model.eval()
         self.e_decay = e_decay
         self.batchs = batchs
-        self.target_update_freq = target_update_freq
+        self.target_update_freq = tuf
         self.target_update_rate = tau
+        self.target_update_method = target_update_method
+        if self.target_update_method == "hard":
+            self.target_update_fn = self.target_update_hard
 
     def load_model(self, path) -> None:
         super().load_model(path)
@@ -47,18 +52,13 @@ class DeepQNetworkAgent(DeepAgent):
         else:
             return torch.argmax(self.model(state)).item()
 
-    def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool, update: str = "soft"):
+    def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool):
         """update: ['hard', 'soft'] = 'soft'"""
         self.rewards.append(reward)
         self.buffer.push(state, action, next_state, reward, episode_over)
         if self.buffer.trainable and self.train:
             self.update_model()
-            if update == "soft":
-                self.target_update_soft()
-            elif update == "hard":
-                self.target_update_hard()
-            else:
-                raise ValueError(f"Wrong target update mode -> {update}")
+            self.target_update_fn()
         if episode_over:
             if self.buffer.trainable and self.train:
                 self.decay_epsilon()
@@ -75,7 +75,7 @@ class DeepQNetworkAgent(DeepAgent):
 
     def target_update_soft(self):
         for target_param, local_param in zip(self.target_model.parameters(), self.model.parameters()):
-            target_param.data.copy_(self.target_update_rate * local_param.data + (1.0 - self.target_update_rate) * target_param.data)
+            target_param.data.copy_((1.0 - self.target_update_rate) * target_param.data + self.target_update_rate * local_param.data)
 
     def update_model(self):
         self.train_count += 1

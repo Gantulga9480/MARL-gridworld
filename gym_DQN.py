@@ -29,10 +29,11 @@ class DQN(nn.Module):
 
 
 ENV_NAME = "CartPole-v1"
+TRAIN_ID = "dqn_rewards_hard"
 env = gym.make(ENV_NAME, render_mode=None)
 agent = DeepQNetworkAgent(4, 2, device="cuda:0")
-agent.create_model(DQN, lr=0.0001, y=0.99, e_decay=0.995, batchs=64, tau=0.01)
-agent.create_buffer(ReplayBuffer(1_000_000, 1000, 4))
+agent.create_model(DQN, lr=0.001, y=0.99, e_decay=0.996, batchs=64, target_update_method="hard", tau=0.001, tuf=10)
+agent.create_buffer(ReplayBuffer(1_000_000, 10_000, 4))
 
 try:
     while agent.episode_count < 1000:
@@ -42,26 +43,26 @@ try:
             a = agent.policy(s)
             ns, r, d, t, i = env.step(a)
             done = d or t
-            agent.learn(s, a, ns, r, done)
+            agent.learn(s, a, ns, r, done, update="hard")
             s = ns
 except KeyboardInterrupt:
     pass
 env.close()
 
+plt.xlabel(f"DQN - {TRAIN_ID}")
 plt.plot(agent.reward_history)
 plt.show()
 
-with open("dqn_rewards_re_old.txt", "w") as f:
+with open(f"{TRAIN_ID}.txt", "w") as f:
     f.writelines([str(item) + '\n' for item in agent.reward_history])
 
-agent.train = False
-
-env = gym.make(ENV_NAME, render_mode="human")
-for _ in range(10):
-    done = False
-    s, i = env.reset(seed=3407)
-    while not done:
-        a = agent.policy(s)
-        s, r, d, t, i = env.step(a)
-        done = d or t
-env.close()
+# agent.train = False
+# env = gym.make(ENV_NAME, render_mode="human")
+# for _ in range(10):
+#     done = False
+#     s, i = env.reset(seed=3407)
+#     while not done:
+#         a = agent.policy(s)
+#         s, r, d, t, i = env.step(a)
+#         done = d or t
+# env.close()
