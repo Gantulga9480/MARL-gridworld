@@ -49,13 +49,8 @@ class DeepQNetworkAgent(DeepAgent):
 
     def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool, update: str = "soft"):
         """update: ['hard', 'soft'] = 'soft'"""
-        batch = len(state.shape) > 1
-        if not batch:
-            self.rewards.append(reward)
-            self.buffer.push(state, action, next_state, reward, episode_over)
-        else:
-            self.rewards.append(np.mean(reward))
-            self.buffer.extend(state, action, next_state, reward, episode_over)
+        self.rewards.append(reward)
+        self.buffer.push(state, action, next_state, reward, episode_over)
         if self.buffer.trainable and self.train:
             self.update_model()
             if update == "soft":
