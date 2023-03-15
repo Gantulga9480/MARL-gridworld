@@ -47,13 +47,9 @@ plt.plot(agent.reward_history)
 plt.show()
 
 env.running = True
-scores = []
 
 while env.running:
     s = env.reset()
-    rewards = []
     while not env.loop_once():
         a = agent.policy(s)
         s, r, d = env.step(a)
-        rewards.append(r)
-    scores.append(sum(rewards))
