@@ -1,4 +1,5 @@
 import torch
+from torch.distributions import Categorical
 from .deep_agent import DeepAgent
 import numpy as np
 
@@ -14,10 +15,15 @@ class ReinforceAgent(DeepAgent):
     def policy(self, state):
         self.step_count += 1
         state = torch.tensor(state, dtype=torch.float32).to(self.device)
-        action, log_prob = self.model(state)
+        if not self.train:
+            self.model.eval()
+        probs = self.model(state)
+        distribution = Categorical(probs)
+        action = distribution.sample()
         if self.train:
+            log_prob = distribution.log_prob(action)
             self.log_probs.append(log_prob)
-        return action
+        return action.item()
 
     def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool):
         self.rewards.append(reward)
@@ -32,6 +38,7 @@ class ReinforceAgent(DeepAgent):
 
     def update_model(self):
         self.train_count += 1
+        self.model.train()
         G = []
         r_sum = 0
         for r in reversed(self.rewards):
@@ -42,7 +49,7 @@ class ReinforceAgent(DeepAgent):
         if len(G) > 1:
             G /= (G.std() + self.eps)
 
-        loss = torch.stack([-log_prob * a for log_prob, a in zip(self.log_probs, G)]).sum()
+        loss = torch.stack([-log_prob * a for log_prob, a in zip(self.log_probs, G)]).mean()
 
         self.optimizer.zero_grad()
         loss.backward()

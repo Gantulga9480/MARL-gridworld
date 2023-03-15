@@ -62,16 +62,16 @@ class ActorCriticAgent(DeepAgent):
             r_sum = r_sum * self.y + r
             G.append(r_sum)
         G = torch.tensor(list(reversed(G)), dtype=torch.float32).to(self.device)
-        G -= G.mean()
-        if len(G) > 1:
-            G /= (G.std() + self.eps)
+        # G -= G.mean()
+        # if len(G) > 1:
+        #     G /= (G.std() + self.eps)
 
         V = torch.cat(self.values)
 
         with torch.no_grad():
             A = G - V
 
-        actor_loss = torch.stack([-log_prob * a for log_prob, a in zip(self.log_probs, A)]).mean()
+        actor_loss = torch.stack([-log_prob * a for log_prob, a in zip(self.log_probs, A)]).sum()
         critic_loss = self.loss_fn(V, G)
 
         self.actor_optimizer.zero_grad()

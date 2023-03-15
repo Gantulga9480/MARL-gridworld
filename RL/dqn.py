@@ -42,17 +42,10 @@ class DeepQNetworkAgent(DeepAgent):
         self.step_count += 1
         self.model.eval()
         state = torch.tensor(state, dtype=torch.float32).to(self.device)
-        is_batch = len(state.size()) > 1
-        if not is_batch:
-            if self.train and np.random.random() < self.e:
-                return np.random.choice(list(range(self.action_space_size)))
-            else:
-                return torch.argmax(self.model(state)).item()
+        if self.train and np.random.random() < self.e:
+            return np.random.choice(list(range(self.action_space_size)))
         else:
-            if self.train and np.random.random() < self.e:
-                return [np.random.choice(list(range(self.action_space_size))) for _ in range(len(state))]
-            else:
-                return torch.argmax(self.model(state), axis=1).tolist()
+            return torch.argmax(self.model(state)).item()
 
     def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool, update: str = "soft"):
         """update: ['hard', 'soft'] = 'soft'"""
@@ -71,12 +64,15 @@ class DeepQNetworkAgent(DeepAgent):
                 self.target_update_hard()
             else:
                 raise ValueError(f"Wrong target update mode -> {update}")
-            self.decay_epsilon()
         if episode_over:
-            self.episode_count += 1
-            self.reward_history.append(np.sum(self.rewards))
+            if self.buffer.trainable and self.train:
+                self.decay_epsilon()
+            if self.e != 1:
+                self.episode_count += 1
+                self.reward_history.append(np.sum(self.rewards))
+                print(f"Episode: {self.episode_count} | Train: {self.train_count} | e: {self.e:.6f} | r: {self.reward_history[-1]:.6f}")
             self.rewards = []
-            print(f"Episode: {self.episode_count} | Train: {self.train_count} | e: {self.e:.6f} | r: {self.reward_history[-1]:.6f}")
+            self.step_count = 0
 
     def target_update_hard(self):
         if self.train_count % self.target_update_freq == 0:

@@ -1,7 +1,7 @@
-from RL.dqn import DeepQNetworkAgent
-from RL.utils import ReplayBuffer
 import torch
 import torch.nn as nn
+from RL.dqn import DeepQNetworkAgent
+from RL.utils import ReplayBuffer
 import numpy as np
 import gym
 import matplotlib.pyplot as plt
@@ -31,11 +31,11 @@ class DQN(nn.Module):
 ENV_NAME = "CartPole-v1"
 env = gym.make(ENV_NAME, render_mode=None)
 agent = DeepQNetworkAgent(4, 2, device="cuda:0")
-agent.create_model(DQN, lr=0.0001, y=0.99, e_decay=0.999, batchs=64, tau=0.01)
+agent.create_model(DQN, lr=0.0001, y=0.99, e_decay=0.995, batchs=64, tau=0.01)
 agent.create_buffer(ReplayBuffer(1_000_000, 1000, 4))
 
 try:
-    while True:
+    while agent.episode_count < 1000:
         done = False
         s, info = env.reset(seed=3407)
         while not done:
@@ -50,6 +50,9 @@ env.close()
 
 plt.plot(agent.reward_history)
 plt.show()
+
+with open("dqn_rewards_re_old.txt", "w") as f:
+    f.writelines([str(item) + '\n' for item in agent.reward_history])
 
 agent.train = False
 
