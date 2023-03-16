@@ -13,7 +13,7 @@ class DeepDeterministicPolicyGradientAgent(DeepAgent):
         self.critic = None
         self.target_critic = None
         self.buffer = None
-        self.batchs = 0
+        self.batch = 0
         self.target_update_rate = 0
         self.noise = 0
         self.train_count = 0
@@ -25,13 +25,13 @@ class DeepDeterministicPolicyGradientAgent(DeepAgent):
 
     def create_buffer(self, buffer: ReplayBufferBase):
         if buffer.min_size == 0:
-            buffer.min_size = self.batchs
+            buffer.min_size = self.batch
         self.buffer = buffer
 
-    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, actor_lr: float, critic_lr: float, y: float, noise_std: float, batchs: int = 64, tau: float = 0.001, reward_norm_factor: float = 1.0):
+    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, actor_lr: float, critic_lr: float, y: float, noise_std: float, batch: int = 64, tau: float = 0.001, reward_norm_factor: float = 1.0):
         self.y = y
         self.noise_std = noise_std
-        self.batchs = batchs
+        self.batch = batch
         self.target_update_rate = tau
         self.reward_norm_factor = reward_norm_factor
         self.actor = actor(self.state_space_size, self.action_space_size)
@@ -84,13 +84,13 @@ class DeepDeterministicPolicyGradientAgent(DeepAgent):
 
     def update_model(self):
         self.train_count += 1
-        s, a, ns, r, d = self.buffer.sample(self.batchs)
+        s, a, ns, r, d = self.buffer.sample(self.batch)
         r /= self.reward_norm_factor
         states = torch.tensor(s, dtype=torch.float32).to(self.device)
-        actions = torch.tensor(a, dtype=torch.float32).view(self.batchs, 1).to(self.device)
+        actions = torch.tensor(a, dtype=torch.float32).view(self.batch, 1).to(self.device)
         next_states = torch.tensor(ns, dtype=torch.float32).to(self.device)
-        rewards = torch.tensor(r, dtype=torch.float32).view(self.batchs, 1).to(self.device)
-        dones = torch.tensor(d, dtype=torch.float32).view(self.batchs, 1).to(self.device)
+        rewards = torch.tensor(r, dtype=torch.float32).view(self.batch, 1).to(self.device)
+        dones = torch.tensor(d, dtype=torch.float32).view(self.batch, 1).to(self.device)
         with torch.no_grad():
             y = rewards + (1 - dones) * self.y * self.target_critic(next_states, self.target_actor(next_states))
         preds = self.critic(states, actions)

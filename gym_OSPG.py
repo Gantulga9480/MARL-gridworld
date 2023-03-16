@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from RL.reinforce import ReinforceAgent
+from RL.one_step_actor import OneStepActor
 import gym
 import matplotlib.pyplot as plt
 torch.manual_seed(3407)
@@ -23,10 +23,10 @@ class PG(nn.Module):
 
 
 ENV_NAME = "CartPole-v1"
-TRAIN_ID = "ri_rewards_sum"
+TRAIN_ID = "OSPG Test"
 env = gym.make(ENV_NAME, render_mode=None)
-agent = ReinforceAgent(4, 2, device="cuda:0")
-agent.create_model(PG, lr=0.001, y=0.99)
+agent = OneStepActor(4, 2, device="cuda:0")
+agent.create_model(PG, lr=0.00001, y=0.99)
 
 try:
     while agent.episode_count < 1000:
@@ -42,21 +42,17 @@ except KeyboardInterrupt:
     pass
 env.close()
 
-# with open(f"{TRAIN_ID}.txt", "w") as f:
-#     f.writelines([str(item) + '\n' for item in agent.reward_history])
-
 plt.xlabel(f"{ENV_NAME} - {TRAIN_ID}")
 plt.plot(agent.reward_history)
 plt.show()
 
-agent.train = False
-
-env = gym.make(ENV_NAME, render_mode="human")
-for _ in range(10):
-    done = False
-    s, i = env.reset(seed=3407)
-    while not done:
-        a = agent.policy(s)
-        s, r, d, t, i = env.step(a)
-        done = d or t
-env.close()
+# agent.train = False
+# env = gym.make(ENV_NAME, render_mode="human")
+# for _ in range(10):
+#     done = False
+#     s, i = env.reset(seed=3407)
+#     while not done:
+#         a = agent.policy(s)
+#         s, r, d, t, i = env.step(a)
+#         done = d or t
+# env.close()
