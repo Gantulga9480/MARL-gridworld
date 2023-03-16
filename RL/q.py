@@ -30,8 +30,9 @@ class QLearningAgent(Agent):
         else:
             self.model[state][action] = reward
             self.episode_count += 1
+            self.step_count = 0
             self.reward_history.append(np.sum(self.rewards))
-            self.rewards = []
+            self.rewards.clear()
             print(f"Episode: {self.episode_count} | Train: {self.train_count} | e: {self.e:.6f} | r: {self.reward_history[-1]:.6f}")
         self.decay_epsilon()
 

@@ -37,10 +37,10 @@ class Critic(nn.Module):
 
 
 ENV_NAME = "CartPole-v1"
-TRAIN_ID = "ac_rewards_std_mean"
+TRAIN_ID = "ac_rewards_std_mean_test_norm"
 env = gym.make(ENV_NAME, render_mode=None)
 agent = ActorCriticAgent(4, 2, device="cuda:0")
-agent.create_model(Actor, Critic, actor_lr=0.001, critic_lr=0.01, y=0.99)
+agent.create_model(Actor, Critic, actor_lr=0.001, critic_lr=0.001, y=0.99, reward_norm_factor=1)
 
 try:
     while agent.episode_count < 1000:
@@ -63,14 +63,13 @@ plt.show()
 with open(f"{TRAIN_ID}.txt", "w") as f:
     f.writelines([str(item) + '\n' for item in agent.reward_history])
 
-agent.train = False
-
-env = gym.make(ENV_NAME, render_mode="human")
-for _ in range(10):
-    done = False
-    s, i = env.reset(seed=3407)
-    while not done:
-        a = agent.policy(s)
-        s, r, d, t, i = env.step(a)
-        done = d or t
-env.close()
+# agent.train = False
+# env = gym.make(ENV_NAME, render_mode="human")
+# for _ in range(10):
+#     done = False
+#     s, i = env.reset(seed=3407)
+#     while not done:
+#         a = agent.policy(s)
+#         s, r, d, t, i = env.step(a)
+#         done = d or t
+# env.close()

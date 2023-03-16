@@ -32,7 +32,7 @@ ENV_NAME = "CartPole-v1"
 TRAIN_ID = "dqn_rewards_hard"
 env = gym.make(ENV_NAME, render_mode=None)
 agent = DeepQNetworkAgent(4, 2, device="cuda:0")
-agent.create_model(DQN, lr=0.001, y=0.99, e_decay=0.996, batchs=64, target_update_method="hard", tau=0.001, tuf=10)
+agent.create_model(DQN, lr=0.0001, y=0.99, e_decay=0.996, batchs=64, target_update_method="hard", tau=0.001, tuf=10)
 agent.create_buffer(ReplayBuffer(1_000_000, 10_000, 4))
 
 try:
@@ -43,7 +43,7 @@ try:
             a = agent.policy(s)
             ns, r, d, t, i = env.step(a)
             done = d or t
-            agent.learn(s, a, ns, r, done, update="hard")
+            agent.learn(s, a, ns, r, done)
             s = ns
 except KeyboardInterrupt:
     pass
@@ -53,8 +53,8 @@ plt.xlabel(f"DQN - {TRAIN_ID}")
 plt.plot(agent.reward_history)
 plt.show()
 
-with open(f"{TRAIN_ID}.txt", "w") as f:
-    f.writelines([str(item) + '\n' for item in agent.reward_history])
+# with open(f"{TRAIN_ID}.txt", "w") as f:
+#     f.writelines([str(item) + '\n' for item in agent.reward_history])
 
 # agent.train = False
 # env = gym.make(ENV_NAME, render_mode="human")

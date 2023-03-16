@@ -11,6 +11,7 @@ class DeepQNetworkAgent(DeepAgent):
         self.target_model = None
         self.buffer = None
         self.batchs = 0
+        self.reward_norm_factor = 1
         self.target_update_freq = 0
         self.target_update_rate = 0
         self.target_update_method = "soft"
@@ -22,7 +23,7 @@ class DeepQNetworkAgent(DeepAgent):
             buffer.min_size = self.batchs
         self.buffer = buffer
 
-    def create_model(self, model: torch.nn.Module, lr: float, y: float, e_decay: float = 0.999999, batchs: int = 64, target_update_method: str = "soft", tuf: int = 10, tau: float = 0.001):
+    def create_model(self, model: torch.nn.Module, lr: float, y: float, e_decay: float = 0.999999, batchs: int = 64, target_update_method: str = "soft", tuf: int = 10, tau: float = 0.001, reward_norm_factor: float = 1):
         super().create_model(model, lr, y)
         self.target_model = model(self.state_space_size, self.action_space_size)
         self.target_model.load_state_dict(self.model.state_dict())
@@ -35,6 +36,7 @@ class DeepQNetworkAgent(DeepAgent):
         self.target_update_method = target_update_method
         if self.target_update_method == "hard":
             self.target_update_fn = self.target_update_hard
+        self.reward_norm_factor = reward_norm_factor
 
     def load_model(self, path) -> None:
         super().load_model(path)
@@ -80,6 +82,7 @@ class DeepQNetworkAgent(DeepAgent):
     def update_model(self):
         self.train_count += 1
         s, a, ns, r, d = self.buffer.sample(self.batchs)
+        r /= self.reward_norm_factor
         self.model.eval()
         states = torch.tensor(s, dtype=torch.float32).to(self.device)
         next_states = torch.tensor(ns, dtype=torch.float32).to(self.device)
