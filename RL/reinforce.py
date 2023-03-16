@@ -11,9 +11,9 @@ class ReinforceAgent(DeepAgent):
         self.log_probs = []
         self.rewards = []
         self.eps = np.finfo(np.float32).eps.item()
-        self.reward_norm_factor = 1
+        self.reward_norm_factor = 1.0
 
-    def create_model(self, model: torch.nn.Module, lr: float, y: float, reward_norm_factor: float = 1):
+    def create_model(self, model: torch.nn.Module, lr: float, y: float, reward_norm_factor: float = 1.0):
         self.reward_norm_factor = reward_norm_factor
         return super().create_model(model, lr, y)
 
@@ -46,7 +46,7 @@ class ReinforceAgent(DeepAgent):
             return False
         self.train_count += 1
         self.model.train()
-        g = np.array(self.rewards)
+        g = np.array(self.rewards, dtype=np.float32)
         g /= self.reward_norm_factor
         r_sum = 0
         for i in reversed(range(g.shape[0])):

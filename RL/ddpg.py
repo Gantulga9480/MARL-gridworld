@@ -18,7 +18,7 @@ class DeepDeterministicPolicyGradientAgent(DeepAgent):
         self.noise = 0
         self.train_count = 0
         self.loss_fn = torch.nn.HuberLoss()
-        self.reward_norm_factor = 1
+        self.reward_norm_factor = 1.0
         del self.lr
         del self.model
         del self.optimizer
@@ -28,7 +28,7 @@ class DeepDeterministicPolicyGradientAgent(DeepAgent):
             buffer.min_size = self.batchs
         self.buffer = buffer
 
-    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, actor_lr: float, critic_lr: float, y: float, noise_std: float, batchs: int = 64, tau: float = 0.001, reward_norm_factor: float = 1):
+    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, actor_lr: float, critic_lr: float, y: float, noise_std: float, batchs: int = 64, tau: float = 0.001, reward_norm_factor: float = 1.0):
         self.y = y
         self.noise_std = noise_std
         self.batchs = batchs

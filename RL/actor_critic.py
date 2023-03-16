@@ -14,12 +14,12 @@ class ActorCriticAgent(DeepAgent):
         self.values = []
         self.eps = np.finfo(np.float32).eps.item()
         self.loss_fn = torch.nn.HuberLoss()
-        self.reward_norm_factor = 1
+        self.reward_norm_factor = 1.0
         del self.model
         del self.optimizer
         del self.lr
 
-    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, actor_lr: float, critic_lr: float, y: float, reward_norm_factor: float = 1):
+    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, actor_lr: float, critic_lr: float, y: float, reward_norm_factor: float = 1.0):
         self.y = y
         self.reward_norm_factor = reward_norm_factor
         self.actor = actor(self.state_space_size, self.action_space_size)
@@ -62,7 +62,7 @@ class ActorCriticAgent(DeepAgent):
             return False
         self.train_count += 1
         self.actor.train()
-        g = np.array(self.rewards)
+        g = np.array(self.rewards, dtype=np.float32)
         g /= self.reward_norm_factor
         r_sum = 0
         for i in reversed(range(g.shape[0])):

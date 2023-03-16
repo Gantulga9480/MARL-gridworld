@@ -11,7 +11,7 @@ class DeepQNetworkAgent(DeepAgent):
         self.target_model = None
         self.buffer = None
         self.batchs = 0
-        self.reward_norm_factor = 1
+        self.reward_norm_factor = 1.0
         self.target_update_freq = 0
         self.target_update_rate = 0
         self.target_update_method = "soft"
@@ -23,7 +23,7 @@ class DeepQNetworkAgent(DeepAgent):
             buffer.min_size = self.batchs
         self.buffer = buffer
 
-    def create_model(self, model: torch.nn.Module, lr: float, y: float, e_decay: float = 0.999999, batchs: int = 64, target_update_method: str = "soft", tuf: int = 10, tau: float = 0.001, reward_norm_factor: float = 1):
+    def create_model(self, model: torch.nn.Module, lr: float, y: float, e_decay: float = 0.999999, batchs: int = 64, target_update_method: str = "soft", tuf: int = 10, tau: float = 0.001, reward_norm_factor: float = 1.0):
         super().create_model(model, lr, y)
         self.target_model = model(self.state_space_size, self.action_space_size)
         self.target_model.load_state_dict(self.model.state_dict())
