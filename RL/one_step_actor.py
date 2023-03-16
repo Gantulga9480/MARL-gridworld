@@ -2,7 +2,6 @@ import torch
 from torch.distributions import Categorical
 import numpy as np
 from .deep_agent import DeepAgent
-from .utils import ReplayBufferBase
 
 
 class OneStepActor(DeepAgent):
@@ -12,19 +11,12 @@ class OneStepActor(DeepAgent):
         self.log_prob = None
         self.eps = np.finfo(np.float32).eps.item()
         self.reward_norm_factor = 1.0
+        self.g = 0.0
         self.i = 1.0
-        self.g = 0
-        self.buffer = None
-        self.batch = 64
 
     def create_model(self, model: torch.nn.Module, lr: float, y: float, reward_norm_factor: float = 1.0):
         self.reward_norm_factor = reward_norm_factor
         return super().create_model(model, lr, y)
-
-    def create_buffer(self, buffer: ReplayBufferBase):
-        if buffer.min_size == 0:
-            buffer.min_size = self.batch
-        self.buffer = buffer
 
     def policy(self, state):
         self.step_count += 1
@@ -43,8 +35,8 @@ class OneStepActor(DeepAgent):
         if self.train:
             self.update_model(reward)
         if episode_over:
-            self.i = 1
-            self.g = 0
+            self.i = 1.0
+            self.g = 0.0
             self.episode_count += 1
             self.step_count = 0
             self.reward_history.append(np.sum(self.rewards))
@@ -54,9 +46,8 @@ class OneStepActor(DeepAgent):
     def update_model(self, reward):
         self.train_count += 1
         self.model.train()
-        s, a, ns, r, d = self.buffer.sample(self.batch)
         self.g = self.g * self.y + reward
-        loss = -self.log_prob * self.g
+        loss = -self.log_prob * (self.g * self.i)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()

@@ -31,11 +31,7 @@ class Critic(nn.Module):
     def __init__(self, observation_size) -> None:
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(observation_size, 512),
-            nn.LeakyReLU(),
-            nn.Linear(512, 256),
-            nn.LeakyReLU(),
-            nn.Linear(256, 128),
+            nn.Linear(observation_size, 128),
             nn.LeakyReLU(),
             nn.Linear(128, 1)
         )

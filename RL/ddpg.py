@@ -87,7 +87,7 @@ class DeepDeterministicPolicyGradientAgent(DeepAgent):
         s, a, ns, r, d = self.buffer.sample(self.batch)
         r /= self.reward_norm_factor
         states = torch.tensor(s, dtype=torch.float32).to(self.device)
-        actions = torch.tensor(a, dtype=torch.float32).view(self.batch, 1).to(self.device)
+        actions = torch.tensor(a, dtype=torch.float32).view(self.batch, self.action_space_size).to(self.device)
         next_states = torch.tensor(ns, dtype=torch.float32).to(self.device)
         rewards = torch.tensor(r, dtype=torch.float32).view(self.batch, 1).to(self.device)
         dones = torch.tensor(d, dtype=torch.float32).view(self.batch, 1).to(self.device)

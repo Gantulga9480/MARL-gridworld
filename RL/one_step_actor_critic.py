@@ -68,19 +68,14 @@ class OneStepActorCriticAgent(DeepAgent):
                 current_state_target = reward
 
         critic_loss = current_state_target - self.value
-        actor_loss = self.log_prob * critic_loss.item()
+        actor_loss = -self.log_prob * critic_loss.item()
 
-        self.critic.zero_grad()
+        self.actor_optimizer.zero_grad()
+        actor_loss.backward()
+        self.actor_optimizer.step()
+
+        self.critic_optimizer.zero_grad()
         critic_loss.backward()
-        for p in self.critic.parameters():
-            grad = p.grad() * self.i * 0.01
-
-        # self.actor_optimizer.zero_grad()
-        # actor_loss.backward()
-        # self.actor_optimizer.step()
-
-        # self.critic_optimizer.zero_grad()
-        # critic_loss.backward()
-        # self.critic_optimizer.step()
+        self.critic_optimizer.step()
 
         self. i *= self.y

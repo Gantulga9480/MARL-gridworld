@@ -51,18 +51,18 @@ class Critic(nn.Module):
         return self.model(torch.cat([state, action], dim=1))
 
 
-ENV_NAME = "InvertedPendulum-v4"
+ENV_NAME = "Walker2d-v4"
 env = gym.make(ENV_NAME, render_mode=None)
-agent = DDPGAgent(4, 1, device="cuda:0")
-agent.create_model(Actor, Critic, lr=0.0001, y=0.99, noise_std=0.1, batchs=64, tau=0.01)
-agent.create_buffer(ReplayBuffer(1_000_000, 1000, 4))
+agent = DDPGAgent(17, 6, device="cuda:0")
+agent.create_model(Actor, Critic, actor_lr=0.0001, critic_lr=0.0001, y=0.99, noise_std=0.1, batch=64, tau=0.1)
+agent.create_buffer(ReplayBuffer(1_000_000, 10_000, 17, 6))
 
 try:
     while agent.episode_count < 1000:
         done = False
         s, info = env.reset(seed=3407)
         while not done:
-            a = agent.policy(s) * 3
+            a = agent.policy(s)
             ns, r, d, t, i = env.step(a)
             done = d or t
             agent.learn(s, a, ns, r, done)

@@ -26,7 +26,7 @@ ENV_NAME = "CartPole-v1"
 TRAIN_ID = "OSPG Test"
 env = gym.make(ENV_NAME, render_mode=None)
 agent = OneStepActor(4, 2, device="cuda:0")
-agent.create_model(PG, lr=0.00001, y=0.99)
+agent.create_model(PG, lr=0.0001, y=0.99)
 
 try:
     while agent.episode_count < 1000:
