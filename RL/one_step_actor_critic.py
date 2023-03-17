@@ -61,21 +61,21 @@ class OneStepActorCriticAgent(DeepAgent):
 
         next_state = torch.tensor(next_state, dtype=torch.float32).to(self.device)
 
-        with torch.no_grad():
-            if not done:
-                current_state_target = reward + self.y * self.critic(next_state)
-            else:
-                current_state_target = reward
+        next_state_value = self.critic(next_state) if not done else torch.tensor([0]).float().to(self.device)
 
-        critic_loss = current_state_target - self.value
-        actor_loss = -self.log_prob * critic_loss.item()
+        self.critic_loss = self.loss_fn(self.value, reward + self.y * next_state_value)
+        self.critic_loss *= self.i
+
+        td_error = reward + self.y * next_state_value.item() - self.value.item()
+
+        self.actor_loss = -self.log_prob * td_error
+        self.actor_loss *= self.i
 
         self.actor_optimizer.zero_grad()
-        actor_loss.backward()
+        self.actor_loss.backward()
         self.actor_optimizer.step()
-
         self.critic_optimizer.zero_grad()
-        critic_loss.backward()
+        self.critic_loss.backward()
         self.critic_optimizer.step()
 
-        self. i *= self.y
+        self.i *= self.y
