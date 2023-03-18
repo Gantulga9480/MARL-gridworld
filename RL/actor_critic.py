@@ -13,7 +13,7 @@ class ActorCriticAgent(DeepAgent):
         self.log_probs = []
         self.values = []
         self.eps = np.finfo(np.float32).eps.item()
-        self.loss_fn = torch.nn.HuberLoss()
+        self.loss_fn = torch.nn.HuberLoss(reduction='sum')
         self.reward_norm_factor = 1.0
         del self.model
         del self.optimizer
@@ -69,15 +69,15 @@ class ActorCriticAgent(DeepAgent):
             r_sum = r_sum * self.y + g[i]
             g[i] = r_sum
         G = torch.tensor(g, dtype=torch.float32).to(self.device)
-        G -= G.mean()
-        G /= (G.std() + self.eps)
+        # G -= G.mean()
+        # G /= (G.std() + self.eps)
 
         V = torch.cat(self.values)
 
         with torch.no_grad():
             A = G - V
 
-        actor_loss = torch.stack([-log_prob * a for log_prob, a in zip(self.log_probs, A)]).mean()
+        actor_loss = torch.stack([-log_prob * a for log_prob, a in zip(self.log_probs, A)]).sum()
         critic_loss = self.loss_fn(V, G)
 
         self.actor_optimizer.zero_grad()
