@@ -11,7 +11,6 @@ class OneStepActorCriticAgent(DeepAgent):
         self.actor = None
         self.critic = None
         self.log_prob = None
-        self.value = None
         self.eps = np.finfo(np.float32).eps.item()
         self.loss_fn = torch.nn.HuberLoss()
         self.i = 1
@@ -39,14 +38,13 @@ class OneStepActorCriticAgent(DeepAgent):
         distribution = Categorical(probs)
         action = distribution.sample()
         if self.train:
-            self.value = self.critic(state)
             self.log_prob = distribution.log_prob(action)
         return action.item()
 
     def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool):
         self.rewards.append(reward)
         if self.train:
-            self.update_model(next_state, reward, episode_over)
+            self.update_model(state, next_state, reward, episode_over)
         if episode_over:
             self.i = 1
             self.episode_count += 1
@@ -55,27 +53,29 @@ class OneStepActorCriticAgent(DeepAgent):
             self.rewards.clear()
             print(f"Episode: {self.episode_count} | Train: {self.train_count} | r: {self.reward_history[-1]:.6f}")
 
-    def update_model(self, next_state, reward, done):
+    def update_model(self, state, next_state, reward, done):
         self.train_count += 1
         self.actor.train()
 
+        state = torch.tensor(state, dtype=torch.float32).to(self.device)
         next_state = torch.tensor(next_state, dtype=torch.float32).to(self.device)
 
         next_state_value = self.critic(next_state) if not done else torch.tensor([0]).float().to(self.device)
+        current_value = self.critic(state)
 
-        self.critic_loss = self.loss_fn(self.value, reward + self.y * next_state_value)
-        self.critic_loss *= self.i
+        critic_loss = self.loss_fn(current_value, reward + self.y * next_state_value)
+        critic_loss *= self.i
 
-        td_error = reward + self.y * next_state_value.item() - self.value.item()
-
-        self.actor_loss = -self.log_prob * td_error
-        self.actor_loss *= self.i
+        td_error = reward + self.y * next_state_value.item() - current_value.item()
+        actor_loss = -self.log_prob * td_error
+        actor_loss *= self.i
 
         self.actor_optimizer.zero_grad()
-        self.actor_loss.backward()
+        actor_loss.backward()
         self.actor_optimizer.step()
+
         self.critic_optimizer.zero_grad()
-        self.critic_loss.backward()
+        critic_loss.backward()
         self.critic_optimizer.step()
 
         self.i *= self.y

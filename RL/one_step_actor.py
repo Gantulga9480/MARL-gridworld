@@ -46,9 +46,10 @@ class OneStepActor(DeepAgent):
     def update_model(self, reward):
         self.train_count += 1
         self.model.train()
-        self.g = self.g * self.y + reward
-        loss = -self.log_prob * (self.g * self.i)
+        td_error = reward + self.y * self.g - self.g
+        self.loss = -self.log_prob * (td_error * self.i)
         self.optimizer.zero_grad()
-        loss.backward()
+        self.loss.backward()
         self.optimizer.step()
+        self.g = reward + self.y * self.g
         self.i *= self.y
