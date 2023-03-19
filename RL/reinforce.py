@@ -55,7 +55,7 @@ class ReinforceAgent(DeepAgent):
         G -= G.mean()
         G /= (G.std() + self.eps)
 
-        loss = torch.stack([-log_prob * r for log_prob, r in zip(self.log_probs, G)]).mean()
+        loss = torch.stack([-log_prob * r for log_prob, r in zip(self.log_probs, G)]).sum()
 
         self.optimizer.zero_grad()
         loss.backward()

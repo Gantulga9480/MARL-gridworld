@@ -37,7 +37,7 @@ class Critic(nn.Module):
 
 
 ENV_NAME = "CartPole-v1"
-TRAIN_ID = "OSAC test"
+TRAIN_ID = "OSAC_rewards_itr1"
 env = gym.make(ENV_NAME, render_mode=None)
 agent = OneStepActorCriticAgent(env.observation_space.shape[0], env.action_space.n, device="cuda:0")
 agent.create_model(Actor, Critic, actor_lr=0.001, critic_lr=0.001, y=0.99)
@@ -59,6 +59,9 @@ env.close()
 plt.xlabel(f"{ENV_NAME} - {TRAIN_ID}")
 plt.plot(agent.reward_history)
 plt.show()
+
+with open(f"results/{TRAIN_ID}.txt", "w") as f:
+    f.writelines([str(item) + '\n' for item in agent.reward_history])
 
 # agent.train = False
 # env = gym.make(ENV_NAME, render_mode="human")
