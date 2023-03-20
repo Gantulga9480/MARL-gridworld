@@ -74,6 +74,9 @@ env.close()
 plt.plot(agent.reward_history)
 plt.show()
 
+with open(f"ddpg_rewards_{agent.lr}_{agent.target_update_rate}.txt", "w") as f:
+    f.writelines([str(item) + '\n' for item in agent.reward_history])
+
 agent.train = False
 
 env = gym.make(ENV_NAME, render_mode="human")
