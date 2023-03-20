@@ -3,51 +3,50 @@ import matplotlib
 import matplotlib.pylab as plt
 import argparse
 
-font = {'weight': 'normal',
-        'size': 18}
-
+font = {'weight': 'normal', 'size': 18}
 matplotlib.rc('font', **font)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-r', '--rewards-list', nargs='+', default=[])
-parser.add_argument('-a', '--average', nargs='+', default=[])
-parser.add_argument('-w', '--window-size', type=int, default=100)
+parser.add_argument('rewards', nargs='+')
+parser.add_argument('--width', type=int, default=100)
+parser.add_argument("--average", action="store_true")
+parser.add_argument('--save', action="store_true")
 args = parser.parse_args()
 
-if args.rewards_list and args.average:
-    raise ValueError("Use only one of '-r' or '-a'")
 
-if args.rewards_list:
-    rewards = []
+def moving_average(x, w):
+    return np.convolve(x, np.ones(w), 'valid') / w
+
+
+if not args.average:
+    rewards_list = []
     file_names = []
-    window = args.window_size
-
-    for file in args.rewards_list:
+    for file in args.rewards:
         try:
             with open(file, 'r') as f:
                 lines = f.readlines()
-                data = [float(item.strip()) for item in lines]
-                d = []
-                for i in range(len(data) - window):
-                    d.append(sum(data[i:i + window]) / window)
-                rewards.append(d)
+                rewards_list.append(np.array([float(item.strip()) for item in lines]))
                 file_names.append(file.split(".")[0])
         except IsADirectoryError:
             continue
 
+    avgs = []
+    for rewards in rewards_list:
+        avgs.append(moving_average(rewards, args.width))
+
     fig1, ax1 = plt.subplots()
-    for i, r in enumerate(rewards):
+    for i, r in enumerate(avgs):
         ax1.plot(r, label=file_names[i], linewidth="5")
+    plt.title("Training result")
     ax1.legend()
-    ax1.set_xlabel("Cart-Pole performance")
+    ax1.set_xlabel("Episode")
+    ax1.set_ylabel("Reward")
     plt.show()
 
 elif args.average:
     rewards = []
     file_names = []
-    window = args.window_size
-
-    for file in args.average:
+    for file in args.rewards:
         try:
             with open(file, 'r') as f:
                 lines = f.readlines()
@@ -58,16 +57,16 @@ elif args.average:
             continue
     np_r = np.array(rewards)
     np_r = np_r.mean(axis=0)
-
-    d = []
-    for i in range(len(np_r) - window):
-        d.append(np.mean(np_r[i:i + window]))
+    avg = moving_average(np_r, args.width)
 
     fig1, ax1 = plt.subplots()
-    ax1.plot(d, label="Average", linewidth="5")
+    ax1.plot(avg, label="Average", linewidth="5")
     ax1.legend()
-    ax1.set_xlabel("Cart-Pole performance")
+    ax1.set_xlabel("Episode")
+    ax1.set_ylabel("Reward")
+    plt.title("Average training curve")
     plt.show()
 
-    with open(f'{file_names[0]}', 'w') as f:
-        f.writelines([str(item) + '\n' for item in d])
+    if args.save:
+        with open(f'{file_names[0]}', 'w') as f:
+            f.writelines([str(item) + '\n' for item in avg])

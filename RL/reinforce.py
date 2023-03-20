@@ -21,12 +21,16 @@ class ReinforceAgent(DeepAgent):
         state = torch.tensor(state, dtype=torch.float32).to(self.device)
         if not self.train:
             self.model.eval()
+            with torch.no_grad():
+                probs = self.model(state)
+                distribution = Categorical(probs)
+                action = distribution.sample()
+                return action.item()
         probs = self.model(state)
         distribution = Categorical(probs)
         action = distribution.sample()
-        if self.train:
-            log_prob = distribution.log_prob(action)
-            self.log_probs.append(log_prob)
+        log_prob = distribution.log_prob(action)
+        self.log_probs.append(log_prob)
         return action.item()
 
     def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool):

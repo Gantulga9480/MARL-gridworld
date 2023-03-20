@@ -53,7 +53,7 @@ class DeepQNetworkAgent(DeepAgent):
         self.model.eval()
         state = torch.tensor(state, dtype=torch.float32).to(self.device)
         if self.train and np.random.random() < self.e:
-            return np.random.choice(list(range(self.action_space_size)))
+            return np.random.choice(self.action_space_size)
         else:
             return torch.argmax(self.model(state)).item()
 

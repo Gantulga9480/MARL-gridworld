@@ -12,6 +12,12 @@ class DeepAgent(Agent):
         self.optimizer = None
         self.loss_fn = None
 
+    def train(self):
+        pass
+
+    def eval(self):
+        pass
+
     def create_model(self, model: torch.nn.Module, lr: float, y: float):
         self.lr = lr
         self.y = y
