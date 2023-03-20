@@ -42,8 +42,8 @@ except KeyboardInterrupt:
     pass
 env.close()
 
-with open(f"{TRAIN_ID}.txt", "w") as f:
-    f.writelines([str(item) + '\n' for item in agent.reward_history])
+# with open(f"{TRAIN_ID}.txt", "w") as f:
+#     f.writelines([str(item) + '\n' for item in agent.reward_history])
 
 plt.xlabel(f"{ENV_NAME} - {TRAIN_ID}")
 plt.plot(agent.reward_history)

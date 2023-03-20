@@ -4,16 +4,16 @@ from .deep_agent import DeepAgent
 import numpy as np
 
 
-class ActorCriticAgent(DeepAgent):
+class OneStepActorCriticAgent(DeepAgent):
 
     def __init__(self, state_space_size: int, action_space_size: int, device: str = 'cpu') -> None:
         super().__init__(state_space_size, action_space_size, device)
         self.actor = None
         self.critic = None
-        self.log_probs = []
-        self.values = []
+        self.log_prob = None
         self.eps = np.finfo(np.float32).eps.item()
         self.loss_fn = torch.nn.HuberLoss()
+        self.i = 1
         del self.model
         del self.optimizer
         del self.lr
@@ -38,41 +38,37 @@ class ActorCriticAgent(DeepAgent):
         distribution = Categorical(probs)
         action = distribution.sample()
         if self.train:
-            value = self.critic(state)
-            log_prob = distribution.log_prob(action)
-            self.log_probs.append(log_prob)
-            self.values.append(value)
+            self.log_prob = distribution.log_prob(action)
         return action.item()
 
     def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool):
+        self.rewards.append(reward)
         if self.train:
-            self.rewards.append(reward)
-            if episode_over:
-                self.episode_count += 1
-                self.reward_history.append(np.sum(self.rewards))
-                self.update_model()
-                print(f"Episode: {self.episode_count} | Train: {self.train_count} | r: {self.reward_history[-1]:.6f}")
+            self.update_model(state, next_state, reward, episode_over)
+        if episode_over:
+            self.i = 1
+            self.episode_count += 1
+            self.step_count = 0
+            self.reward_history.append(np.sum(self.rewards))
+            self.rewards.clear()
+            print(f"Episode: {self.episode_count} | Train: {self.train_count} | r: {self.reward_history[-1]:.6f}")
 
-    def update_model(self):
+    def update_model(self, state, next_state, reward, done):
         self.train_count += 1
         self.actor.train()
-        G = []
-        r_sum = 0
-        for r in reversed(self.rewards):
-            r_sum = r_sum * self.y + r
-            G.append(r_sum)
-        G = torch.tensor(list(reversed(G)), dtype=torch.float32).to(self.device)
-        # G -= G.mean()
-        # if len(G) > 1:
-        #     G /= (G.std() + self.eps)
 
-        V = torch.cat(self.values)
+        state = torch.tensor(state, dtype=torch.float32).to(self.device)
+        next_state = torch.tensor(next_state, dtype=torch.float32).to(self.device)
 
-        with torch.no_grad():
-            A = G - V
+        next_state_value = self.critic(next_state) if not done else torch.tensor([0]).float().to(self.device)
+        current_value = self.critic(state)
 
-        actor_loss = torch.stack([-log_prob * a for log_prob, a in zip(self.log_probs, A)]).sum()
-        critic_loss = self.loss_fn(V, G)
+        critic_loss = self.loss_fn(current_value, reward + self.y * next_state_value)
+        critic_loss *= self.i
+
+        td_error = reward + self.y * next_state_value.item() - current_value.item()
+        actor_loss = -self.log_prob * td_error
+        actor_loss *= self.i
 
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
@@ -82,6 +78,4 @@ class ActorCriticAgent(DeepAgent):
         critic_loss.backward()
         self.critic_optimizer.step()
 
-        self.rewards.clear()
-        self.log_probs.clear()
-        self.values.clear()
+        self.i *= self.y

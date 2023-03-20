@@ -1,27 +1,35 @@
 import torch
 import torch.nn as nn
-from RL.dqn import DeepQNetworkAgent
-from RL.utils import ReplayBuffer
-import numpy as np
+from RL.one_step_actor_critic import OneStepActorCriticAgent
 import gym
 import matplotlib.pyplot as plt
 torch.manual_seed(3407)
 torch.cuda.manual_seed(3407)
-np.random.seed(3407)
 
 
-class DQN(nn.Module):
+class Actor(nn.Module):
 
     def __init__(self, observation_size, action_size):
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(observation_size, 512),
+            nn.Linear(observation_size, 128),
             nn.LeakyReLU(),
-            nn.Linear(512, 256),
+            nn.Linear(128, action_size),
+            nn.Softmax(dim=0)
+        )
+
+    def forward(self, x):
+        return self.model(x)
+
+
+class Critic(nn.Module):
+
+    def __init__(self, observation_size) -> None:
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.Linear(observation_size, 128),
             nn.LeakyReLU(),
-            nn.Linear(256, 128),
-            nn.LeakyReLU(),
-            nn.Linear(128, action_size)
+            nn.Linear(128, 1)
         )
 
     def forward(self, x):
@@ -29,16 +37,15 @@ class DQN(nn.Module):
 
 
 ENV_NAME = "CartPole-v1"
-TRAIN_ID = "dqn_rewards_hard"
+TRAIN_ID = "OSAC_rewards_itr1"
 env = gym.make(ENV_NAME, render_mode=None)
-agent = DeepQNetworkAgent(4, 2, device="cuda:0")
-agent.create_model(DQN, lr=0.0001, y=0.99, e_decay=0.996, batchs=64, target_update_method="hard", tau=0.001, tuf=10)
-agent.create_buffer(ReplayBuffer(1_000_000, 10_000, 4))
+agent = OneStepActorCriticAgent(env.observation_space.shape[0], env.action_space.n, device="cuda:0")
+agent.create_model(Actor, Critic, actor_lr=0.001, critic_lr=0.001, y=0.99)
 
 try:
     while agent.episode_count < 1000:
         done = False
-        s, info = env.reset(seed=3407)
+        s, i = env.reset(seed=3407)
         while not done:
             a = agent.policy(s)
             ns, r, d, t, i = env.step(a)
@@ -49,12 +56,12 @@ except KeyboardInterrupt:
     pass
 env.close()
 
-plt.xlabel(f"DQN - {TRAIN_ID}")
+plt.xlabel(f"{ENV_NAME} - {TRAIN_ID}")
 plt.plot(agent.reward_history)
 plt.show()
 
-# with open(f"{TRAIN_ID}.txt", "w") as f:
-#     f.writelines([str(item) + '\n' for item in agent.reward_history])
+with open(f"results/{TRAIN_ID}.txt", "w") as f:
+    f.writelines([str(item) + '\n' for item in agent.reward_history])
 
 # agent.train = False
 # env = gym.make(ENV_NAME, render_mode="human")

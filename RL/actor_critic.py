@@ -13,13 +13,15 @@ class ActorCriticAgent(DeepAgent):
         self.log_probs = []
         self.values = []
         self.eps = np.finfo(np.float32).eps.item()
-        self.loss_fn = torch.nn.HuberLoss()
+        self.loss_fn = torch.nn.HuberLoss(reduction='sum')
+        self.reward_norm_factor = 1.0
         del self.model
         del self.optimizer
         del self.lr
 
-    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, actor_lr: float, critic_lr: float, y: float):
+    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, actor_lr: float, critic_lr: float, y: float, reward_norm_factor: float = 1.0):
         self.y = y
+        self.reward_norm_factor = reward_norm_factor
         self.actor = actor(self.state_space_size, self.action_space_size)
         self.actor.to(self.device)
         self.actor.train()
@@ -45,33 +47,37 @@ class ActorCriticAgent(DeepAgent):
         return action.item()
 
     def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool):
-        if self.train:
-            self.rewards.append(reward)
-            if episode_over:
-                self.episode_count += 1
-                self.reward_history.append(np.sum(self.rewards))
-                self.update_model()
-                print(f"Episode: {self.episode_count} | Train: {self.train_count} | r: {self.reward_history[-1]:.6f}")
+        self.rewards.append(reward)
+        if episode_over:
+            self.episode_count += 1
+            self.step_count = 0
+            self.reward_history.append(np.sum(self.rewards))
+            if self.train:
+                if self.update_model():
+                    print(f"Episode: {self.episode_count} | Train: {self.train_count} | r: {self.reward_history[-1]:.6f}")
+            self.rewards.clear()
 
     def update_model(self):
+        if len(self.rewards) <= 1:
+            return False
         self.train_count += 1
         self.actor.train()
-        G = []
+        g = np.array(self.rewards, dtype=np.float32)
+        g /= self.reward_norm_factor
         r_sum = 0
-        for r in reversed(self.rewards):
-            r_sum = r_sum * self.y + r
-            G.append(r_sum)
-        G = torch.tensor(list(reversed(G)), dtype=torch.float32).to(self.device)
-        G -= G.mean()
-        if len(G) > 1:
-            G /= (G.std() + self.eps)
+        for i in reversed(range(g.shape[0])):
+            r_sum = r_sum * self.y + g[i]
+            g[i] = r_sum
+        G = torch.tensor(g, dtype=torch.float32).to(self.device)
+        # G -= G.mean()
+        # G /= (G.std() + self.eps)
 
         V = torch.cat(self.values)
 
         with torch.no_grad():
             A = G - V
 
-        actor_loss = torch.stack([-log_prob * a for log_prob, a in zip(self.log_probs, A)]).mean()
+        actor_loss = torch.stack([-log_prob * a for log_prob, a in zip(self.log_probs, A)]).sum()
         critic_loss = self.loss_fn(V, G)
 
         self.actor_optimizer.zero_grad()
@@ -82,6 +88,6 @@ class ActorCriticAgent(DeepAgent):
         critic_loss.backward()
         self.critic_optimizer.step()
 
-        self.rewards.clear()
         self.log_probs.clear()
         self.values.clear()
+        return True
