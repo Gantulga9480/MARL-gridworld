@@ -8,6 +8,9 @@ class DeepQNetworkAgent(DeepAgent):
 
     def __init__(self, state_space_size: int, action_space_size: int, device: str = 'cpu') -> None:
         super().__init__(state_space_size, action_space_size, device)
+        self.e = 1
+        self.e_min = 0.01
+        self.e_decay = 0.999999
         self.target_model = None
         self.buffer = None
         self.batch = 0
@@ -56,21 +59,21 @@ class DeepQNetworkAgent(DeepAgent):
 
     def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool):
         """update: ['hard', 'soft'] = 'soft'"""
-        self.rewards.append(reward)
-        if self.train:
-            self.buffer.push(state, action, next_state, reward, episode_over)
-            if self.buffer.trainable:
-                self.update_model()
-                self.target_update_fn()
-        if episode_over:
-            if self.train and self.buffer.trainable:
+        self.buffer.push(state, action, next_state, reward, episode_over)
+        if self.buffer.trainable:
+            self.rewards.append(reward)
+            self.update_model()
+            self.target_update_fn()
+            if episode_over:
                 self.decay_epsilon()
-            if self.e != 1:
                 self.episode_count += 1
+                self.step_count = 0
                 self.reward_history.append(np.sum(self.rewards))
+                self.rewards.clear()
                 print(f"Episode: {self.episode_count} | Train: {self.train_count} | e: {self.e:.6f} | r: {self.reward_history[-1]:.6f}")
-            self.rewards = []
-            self.step_count = 0
+
+    def decay_epsilon(self):
+        self.e = max(self.e_min, self.e * self.e_decay)
 
     def target_update_hard(self):
         if self.train_count % self.target_update_freq == 0:

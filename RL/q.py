@@ -6,6 +6,9 @@ class QLearningAgent(Agent):
 
     def __init__(self, state_space_size: int, action_space_size: int) -> None:
         super().__init__(state_space_size, action_space_size)
+        self.e = 1
+        self.e_min = 0.01
+        self.e_decay = 0.999999
 
     def create_model(self, lr: float = 0.1, y: float = 0.9, e_decay: float = 0.999) -> None:
         self.lr = lr
@@ -41,3 +44,6 @@ class QLearningAgent(Agent):
         if self.train and np.random.random() < self.e:
             return np.random.choice(self.action_space_size)
         return np.argmax(self.model[state])
+
+    def decay_epsilon(self):
+        self.e = max(self.e_min, self.e * self.e_decay)

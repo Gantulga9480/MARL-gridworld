@@ -62,18 +62,18 @@ class DeepDeterministicPolicyGradientAgent(DeepAgent):
         else:
             return action
 
-    def learn(self, state: np.ndarray, action, next_state: np.ndarray, reward, episode_over: bool):
-        self.rewards.append(reward)
+    def learn(self, state: np.ndarray, action: float, next_state: np.ndarray, reward: float, episode_over: bool):
         self.buffer.push(state, action, next_state, reward, episode_over)
-        if self.buffer.trainable and self.train:
+        if self.buffer.trainable:
+            self.rewards.append(reward)
             self.update_model()
             self.update_target()
-        if episode_over:
-            self.episode_count += 1
-            self.step_count = 0
-            self.reward_history.append(np.sum(self.rewards))
-            self.rewards.clear()
-            print(f"Episode: {self.episode_count} | Train: {self.train_count} | r: {self.reward_history[-1]:.6f}")
+            if episode_over:
+                self.step_count = 0
+                self.episode_count += 1
+                self.reward_history.append(np.sum(self.rewards))
+                self.rewards.clear()
+                print(f"Episode: {self.episode_count} | Train: {self.train_count} | r: {self.reward_history[-1]:.6f}")
 
     def update_target(self):
         for target_param, local_param in zip(self.target_actor.parameters(), self.actor.parameters()):

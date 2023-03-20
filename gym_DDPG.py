@@ -15,9 +15,7 @@ class Actor(nn.Module):
     def __init__(self, observation_size, action_size):
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(observation_size, 1024),
-            nn.LeakyReLU(),
-            nn.Linear(1024, 512),
+            nn.Linear(observation_size, 512),
             nn.LeakyReLU(),
             nn.Linear(512, 256),
             nn.LeakyReLU(),
@@ -36,9 +34,7 @@ class Critic(nn.Module):
     def __init__(self, observation_size, action_size):
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(observation_size + action_size, 1024),
-            nn.LeakyReLU(),
-            nn.Linear(1024, 512),
+            nn.Linear(observation_size + action_size, 512),
             nn.LeakyReLU(),
             nn.Linear(512, 256),
             nn.LeakyReLU(),
@@ -51,18 +47,18 @@ class Critic(nn.Module):
         return self.model(torch.cat([state, action], dim=1))
 
 
-ENV_NAME = "Walker2d-v4"
+ENV_NAME = "InvertedPendulum-v4"
 env = gym.make(ENV_NAME, render_mode=None)
-agent = DDPGAgent(17, 6, device="cuda:0")
-agent.create_model(Actor, Critic, actor_lr=0.0001, critic_lr=0.0001, y=0.99, noise_std=0.1, batch=64, tau=0.1)
-agent.create_buffer(ReplayBuffer(1_000_000, 10_000, 17, 6))
+agent = DDPGAgent(4, 1, device="cuda:0")
+agent.create_model(Actor, Critic, actor_lr=0.0001, critic_lr=0.0001, y=0.99, noise_std=0.1, batch=64, tau=0.01)
+agent.create_buffer(ReplayBuffer(1_000_000, 1000, 4, 1))
 
 try:
     while agent.episode_count < 1000:
         done = False
         s, info = env.reset(seed=3407)
         while not done:
-            a = agent.policy(s)
+            a = agent.policy(s) * 3.0
             ns, r, d, t, i = env.step(a)
             done = d or t
             agent.learn(s, a, ns, r, done)
@@ -74,7 +70,7 @@ env.close()
 plt.plot(agent.reward_history)
 plt.show()
 
-with open(f"ddpg_rewards_{agent.lr}_{agent.target_update_rate}.txt", "w") as f:
+with open(f"ddpg_rewards_0.0001_{agent.target_update_rate}.txt", "w") as f:
     f.writelines([str(item) + '\n' for item in agent.reward_history])
 
 agent.train = False
