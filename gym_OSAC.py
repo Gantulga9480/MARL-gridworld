@@ -15,7 +15,7 @@ class Actor(nn.Module):
             nn.Linear(observation_size, 128),
             nn.LeakyReLU(),
             nn.Linear(128, action_size),
-            nn.Softmax(dim=0)
+            nn.Softmax(dim=1)
         )
 
     def forward(self, x):
@@ -37,7 +37,7 @@ class Critic(nn.Module):
 
 
 ENV_NAME = "CartPole-v1"
-TRAIN_ID = "OSAC_rewards_itr1"
+TRAIN_ID = "OSAC_rewards_itr5"
 env = gym.make(ENV_NAME, render_mode=None)
 agent = OneStepActorCriticAgent(env.observation_space.shape[0], env.action_space.n, device="cuda:0")
 agent.create_model(Actor, Critic, actor_lr=0.001, critic_lr=0.001, y=0.99)
@@ -62,14 +62,3 @@ plt.show()
 
 # with open(f"results/{TRAIN_ID}.txt", "w") as f:
 #     f.writelines([str(item) + '\n' for item in agent.reward_history])
-
-agent.train = False
-env = gym.make(ENV_NAME, render_mode="human")
-for _ in range(10):
-    done = False
-    s, i = env.reset(seed=3407)
-    while not done:
-        a = agent.policy(s)
-        s, r, d, t, i = env.step(a)
-        done = d or t
-env.close()

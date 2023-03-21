@@ -18,52 +18,49 @@ class ReinforceAgent(DeepAgent):
 
     def policy(self, state):
         self.step_count += 1
-        state = torch.tensor(state, dtype=torch.float32).to(self.device)
+        state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(self.device)
         if not self.train:
             self.model.eval()
             with torch.no_grad():
-                probs = self.model(state)
+                probs = self.model(state).squeeze(0)
                 distribution = Categorical(probs)
                 action = distribution.sample()
                 return action.item()
-        probs = self.model(state)
+        probs = self.model(state).squeeze(0)
         distribution = Categorical(probs)
         action = distribution.sample()
-        log_prob = distribution.log_prob(action)
+        log_prob = distribution.log_prob(action).unsqueeze(0)
         self.log_probs.append(log_prob)
         return action.item()
 
     def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool):
         self.rewards.append(reward)
         if episode_over:
-            self.episode_count += 1
             self.step_count = 0
             self.reward_history.append(np.sum(self.rewards))
-            if self.train:
-                if self.update_model():
-                    print(f"Episode: {self.episode_count} | Train: {self.train_count} | r: {self.reward_history[-1]:.6f}")
+            if len(self.rewards) > 1:
+                self.episode_count += 1
+                self.update_model()
+                print(f"Episode: {self.episode_count} | Train: {self.train_count} | r: {self.reward_history[-1]:.6f}")
             self.rewards.clear()
 
     def update_model(self):
-        if len(self.rewards) <= 1:
-            return False
         self.train_count += 1
         self.model.train()
         g = np.array(self.rewards, dtype=np.float32)
         g /= self.reward_norm_factor
         r_sum = 0
         for i in reversed(range(g.shape[0])):
-            r_sum = r_sum * self.y + g[i]
-            g[i] = r_sum
-        G = torch.tensor(g, dtype=torch.float32).to(self.device)
+            g[i] = r_sum = r_sum * self.y + g[i]
+        G = torch.tensor(g).to(self.device)
         G -= G.mean()
         G /= (G.std() + self.eps)
 
-        loss = torch.stack([-log_prob * r for log_prob, r in zip(self.log_probs, G)]).sum()
+        log_probs = torch.cat(self.log_probs)
+        loss = -log_probs @ G
 
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
         self.log_probs.clear()
-        return True

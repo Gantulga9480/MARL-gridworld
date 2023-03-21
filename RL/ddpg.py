@@ -86,21 +86,25 @@ class DeepDeterministicPolicyGradientAgent(DeepAgent):
         self.train_count += 1
         s, a, ns, r, d = self.buffer.sample(self.batch)
         r /= self.reward_norm_factor
-        states = torch.tensor(s, dtype=torch.float32).to(self.device)
-        actions = torch.tensor(a, dtype=torch.float32).view(self.batch, self.action_space_size).to(self.device)
-        next_states = torch.tensor(ns, dtype=torch.float32).to(self.device)
-        rewards = torch.tensor(r, dtype=torch.float32).view(self.batch, 1).to(self.device)
-        dones = torch.tensor(d, dtype=torch.float32).view(self.batch, 1).to(self.device)
+        states = torch.tensor(s).float().to(self.device)
+        actions = torch.tensor(a).float().view(self.batch, self.action_space_size).to(self.device)
+        next_states = torch.tensor(ns).float().to(self.device)
+        rewards = torch.tensor(r).float().view(self.batch, 1).to(self.device)
+        dones = torch.tensor(d).float().view(self.batch, 1).to(self.device)
         with torch.no_grad():
             y = rewards + (1 - dones) * self.y * self.target_critic(next_states, self.target_actor(next_states))
+
+        self.actor.train()
         preds = self.critic(states, actions)
         critic_loss = self.loss_fn(preds, y)
+
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
         self.critic_optimizer.step()
 
         p_actions = self.actor(states)
         actor_loss = -self.critic(states, p_actions).mean()
+
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()

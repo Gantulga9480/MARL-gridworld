@@ -15,7 +15,7 @@ class Actor(nn.Module):
             nn.Linear(observation_size, 128),
             nn.LeakyReLU(),
             nn.Linear(128, action_size),
-            nn.Softmax(dim=0)
+            nn.Softmax(dim=1)
         )
 
     def forward(self, x):

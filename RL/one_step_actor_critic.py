@@ -10,16 +10,18 @@ class OneStepActorCriticAgent(DeepAgent):
         super().__init__(state_space_size, action_space_size, device)
         self.actor = None
         self.critic = None
-        self.log_prob = None
+        self.LOG = None
         self.eps = np.finfo(np.float32).eps.item()
         self.loss_fn = torch.nn.HuberLoss(reduction="sum")
         self.i = 1
+        self.reward_norm_factor = 1.0
         del self.model
         del self.optimizer
         del self.lr
 
-    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, actor_lr: float, critic_lr: float, y: float):
+    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, actor_lr: float, critic_lr: float, y: float, reward_norm_factor: float = 1.0):
         self.y = y
+        self.reward_norm_factor = reward_norm_factor
         self.actor = actor(self.state_space_size, self.action_space_size)
         self.actor.to(self.device)
         self.actor.train()
@@ -31,7 +33,7 @@ class OneStepActorCriticAgent(DeepAgent):
 
     def policy(self, state):
         self.step_count += 1
-        state = torch.tensor(state, dtype=torch.float32).to(self.device)
+        state = torch.tensor(state).float().unsqueeze(0).to(self.device)
         if not self.training:
             self.actor.eval()
             with torch.no_grad():
@@ -42,7 +44,7 @@ class OneStepActorCriticAgent(DeepAgent):
         probs = self.actor(state)
         distribution = Categorical(probs)
         action = distribution.sample()
-        self.log_prob = distribution.log_prob(action)
+        self.LOG = distribution.log_prob(action)
         return action.item()
 
     def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool):
@@ -60,29 +62,36 @@ class OneStepActorCriticAgent(DeepAgent):
         self.train_count += 1
         self.actor.train()
 
+        reward /= self.reward_norm_factor
         state = torch.tensor(state, dtype=torch.float32).to(self.device)
         next_state = torch.tensor(next_state, dtype=torch.float32).to(self.device)
 
-        # Bug? It doesn't seem to needed to compute full computational graph when forwarding next_state.
+        # Bug? It doesn't seem to need to compute computational graph when forwarding next_state.
         # But skipping that part breaks learning. Weird!
         # with torch.no_grad():
-        next_state_value = (1.0 - done) * self.critic(next_state)
-        current_value = self.critic(state)
+        # Next state value
+        V_ = (1.0 - done) * self.critic(next_state)
+        # Current state value
+        V = self.critic(state)
 
-        critic_loss = self.loss_fn(current_value, reward + self.y * next_state_value)
+        # Expected return
+        G = reward / self.reward_norm_factor + self.y * V_
+
+        critic_loss = self.loss_fn(V, G)
         critic_loss *= self.i
 
-        # Swapping baseline with Q value for no actor_loss sign
-        td_error = current_value.item() - (reward + self.y * next_state_value.item())
-        actor_loss = self.log_prob * td_error
+        self.critic_optimizer.zero_grad()
+        critic_loss.backward()
+        self.critic_optimizer.step()
+
+        # Swapping position for no negative sign on actor_loss
+        # TD error/Advantage
+        A = V.item() - G.item()
+        actor_loss = self.LOG * A
         actor_loss *= self.i
 
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()
-
-        self.critic_optimizer.zero_grad()
-        critic_loss.backward()
-        self.critic_optimizer.step()
 
         self.i *= self.y

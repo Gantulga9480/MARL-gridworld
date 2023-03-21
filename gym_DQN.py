@@ -32,7 +32,7 @@ ENV_NAME = "CartPole-v1"
 TRAIN_ID = "dqn_rewards_0.95"
 env = gym.make(ENV_NAME, render_mode=None)
 agent = DeepQNetworkAgent(4, 2, device="cuda:0")
-agent.create_model(DQN, lr=0.0001, y=0.99, e_decay=0.95, batch=64, target_update_method="soft", tau=0.01, tuf=10)
+agent.create_model(DQN, lr=0.0001, y=0.99, e_decay=0.9, batch=64, target_update_method="soft", tau=0.01, tuf=10)
 agent.create_buffer(ReplayBuffer(1_000_000, 1000, 4))
 
 try:

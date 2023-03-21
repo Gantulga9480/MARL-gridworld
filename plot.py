@@ -68,5 +68,5 @@ elif args.average:
     plt.show()
 
     if args.save:
-        with open(f'{file_names[0]}', 'w') as f:
+        with open(f'{file_names[0]}_avg.txt', 'w') as f:
             f.writelines([str(item) + '\n' for item in avg])

@@ -33,7 +33,7 @@ class ActorCriticAgent(DeepAgent):
 
     def policy(self, state):
         self.step_count += 1
-        state = torch.tensor(state, dtype=torch.float32).to(self.device)
+        state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(self.device)
         if not self.training:
             self.actor.eval()
             with torch.no_grad():
@@ -64,25 +64,21 @@ class ActorCriticAgent(DeepAgent):
     def update_model(self):
         self.train_count += 1
         self.actor.train()
-        G = torch.tensor(self.rewards).float()
-        G /= self.reward_norm_factor
+        g = np.array(self.rewards, dtype=np.float32)
+        g /= self.reward_norm_factor
         r_sum = 0
-        for i in reversed(range(G.shape[0])):
-            r_sum = r_sum * self.y + G[i]
-            G[i] = r_sum
+        for i in reversed(range(g.shape[0])):
+            g[i] = r_sum = r_sum * self.y + g[i]
+        G = torch.tensor(g).unsqueeze(0).to(self.device)
         G -= G.mean()
         G /= (G.std() + self.eps)
-        G.to(self.device)
 
-        V = torch.cat(self.values)
+        V = torch.cat(self.values, dim=1)
+        # swapping position for no negative sign on actor_loss
+        A = V.detach() - G
 
-        print(V, G)
-        with torch.no_grad():
-            A = V - G  # swapping position for no negative sign on actor_loss
-
-        log_probs = torch.cat(self.log_probs)
-        actor_loss = log_probs @ A
-        # actor_loss = torch.stack([log_prob * a for log_prob, a in zip(self.log_probs, A)]).sum()
+        LOG = torch.cat(self.log_probs)
+        actor_loss = LOG @ A.T
         critic_loss = self.loss_fn(V, G)
 
         self.actor_optimizer.zero_grad()

@@ -87,18 +87,20 @@ class DeepQNetworkAgent(DeepAgent):
         self.train_count += 1
         s, a, ns, r, d = self.buffer.sample(self.batch)
         r /= self.reward_norm_factor
+        states = torch.tensor(s).float().to(self.device)
+        next_states = torch.tensor(ns).float().to(self.device)
+        r = torch.tensor(r).float().to(self.device)
+        d = torch.tensor(d).float().to(self.device)
         self.model.eval()
-        states = torch.tensor(s, dtype=torch.float32).to(self.device)
-        next_states = torch.tensor(ns, dtype=torch.float32).to(self.device)
         with torch.no_grad():
             current_qs = self.model(states)
             future_qs = self.target_model(next_states)
-            for i in range(len(s)):
-                current_qs[i][a[i]] = (r[i] + (1 - d[i]) * self.y * torch.max(future_qs[i])).item()
+            current_qs[torch.arange(self.batch), a] = r + (1 - d) * self.y * torch.max(future_qs, dim=1).values
 
         self.model.train()
         preds = self.model(states)
         loss = self.loss_fn(preds, current_qs).to(self.device)
+
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
