@@ -57,7 +57,7 @@ class DeepDeterministicPolicyGradientAgent(DeepAgent):
         self.actor.eval()
         state = torch.Tensor(state).to(self.device)
         action = self.actor(state).cpu().numpy()
-        if self.train:
+        if self.training:
             return (action + np.random.normal(0, self.noise_std)).clip(-1, 1)
         else:
             return action
