@@ -11,16 +11,26 @@ class ActorCriticAgent(DeepAgent):
         self.actor = None
         self.critic = None
         self.log_probs = []
+        self.entrops = []
         self.values = []
         self.eps = np.finfo(np.float32).eps.item()
         self.loss_fn = torch.nn.HuberLoss(reduction='sum')
         self.reward_norm_factor = 1.0
+        self.entropy_lr = 0.1
         del self.model
         del self.optimizer
         del self.lr
 
-    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, actor_lr: float, critic_lr: float, y: float, reward_norm_factor: float = 1.0):
+    def create_model(self,
+                     actor: torch.nn.Module,
+                     critic: torch.nn.Module,
+                     actor_lr: float,
+                     critic_lr: float,
+                     y: float,
+                     entropy_lr: float,
+                     reward_norm_factor: float = 1.0):
         self.y = y
+        self.entropy_lr = entropy_lr
         self.reward_norm_factor = reward_norm_factor
         self.actor = actor(self.state_space_size, self.action_space_size)
         self.actor.to(self.device)
@@ -45,7 +55,9 @@ class ActorCriticAgent(DeepAgent):
         distribution = Categorical(probs)
         action = distribution.sample()
         log_prob = distribution.log_prob(action)
+        entropy = distribution.entropy()
         self.log_probs.append(log_prob)
+        self.entrops.append(entropy)
         value = self.critic(state)
         self.values.append(value)
         return action.item()
@@ -78,7 +90,8 @@ class ActorCriticAgent(DeepAgent):
         A = V.detach() - G
 
         LOG = torch.cat(self.log_probs)
-        actor_loss = LOG @ A.T
+        ENTROPY = torch.cat(self.entrops).mean()
+        actor_loss = LOG @ A.T + self.entropy_lr * ENTROPY
         critic_loss = self.loss_fn(V, G)
 
         self.actor_optimizer.zero_grad()
@@ -91,3 +104,4 @@ class ActorCriticAgent(DeepAgent):
 
         self.log_probs.clear()
         self.values.clear()
+        self.entrops.clear()

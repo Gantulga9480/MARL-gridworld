@@ -41,6 +41,7 @@ class OneStepActorCriticAgent(DeepAgent):
                 distribution = Categorical(probs)
                 action = distribution.sample()
             return action.item()
+        self.actor.train()
         probs = self.actor(state)
         distribution = Categorical(probs)
         action = distribution.sample()
@@ -60,11 +61,10 @@ class OneStepActorCriticAgent(DeepAgent):
 
     def update_model(self, state, next_state, reward, done):
         self.train_count += 1
-        self.actor.train()
 
         reward /= self.reward_norm_factor
-        state = torch.tensor(state, dtype=torch.float32).to(self.device)
-        next_state = torch.tensor(next_state, dtype=torch.float32).to(self.device)
+        state = torch.tensor(state).float().to(self.device)
+        next_state = torch.tensor(next_state).float().to(self.device)
 
         # Bug? It doesn't seem to need to compute computational graph when forwarding next_state.
         # But skipping that part breaks learning. Weird!
