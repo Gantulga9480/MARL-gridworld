@@ -9,11 +9,18 @@ class ReinforceAgent(DeepAgent):
     def __init__(self, state_space_size: int, action_space_size: int, device: str = 'cpu') -> None:
         super().__init__(state_space_size, action_space_size, device)
         self.log_probs = []
+        self.entrops = []
         self.eps = np.finfo(np.float32).eps.item()
         self.reward_norm_factor = 1.0
+        self.entropy_lr = 0.1
 
-    def create_model(self, model: torch.nn.Module, lr: float, y: float, reward_norm_factor: float = 1.0):
+    def create_model(self,
+                     model: torch.nn.Module,
+                     lr: float,
+                     entropy_lr: float,
+                     y: float, reward_norm_factor: float = 1.0):
         self.reward_norm_factor = reward_norm_factor
+        self.entropy_lr = entropy_lr
         return super().create_model(model, lr, y)
 
     def policy(self, state):
@@ -22,15 +29,17 @@ class ReinforceAgent(DeepAgent):
         if not self.training:
             self.model.eval()
             with torch.no_grad():
-                probs = self.model(state).squeeze(0)
+                probs = self.model(state)
                 distribution = Categorical(probs)
                 action = distribution.sample()
                 return action.item()
-        probs = self.model(state).squeeze(0)
+        probs = self.model(state)
         distribution = Categorical(probs)
         action = distribution.sample()
-        log_prob = distribution.log_prob(action).unsqueeze(0)
+        log_prob = distribution.log_prob(action)
+        entropy = distribution.entropy()
         self.log_probs.append(log_prob)
+        self.entrops.append(entropy)
         return action.item()
 
     def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool):
@@ -52,15 +61,17 @@ class ReinforceAgent(DeepAgent):
         r_sum = 0
         for i in reversed(range(g.shape[0])):
             g[i] = r_sum = r_sum * self.y + g[i]
-        G = torch.tensor(g).to(self.device)
+        G = torch.tensor(g).unsqueeze(0).to(self.device)
         G -= G.mean()
         G /= (G.std() + self.eps)
 
-        log_probs = torch.cat(self.log_probs)
-        loss = -log_probs @ G
+        LOG = torch.cat(self.log_probs)
+        ENTROPY = torch.cat(self.entrops).mean()
+        loss = -LOG @ G.T + 0.5 * ENTROPY
 
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
         self.log_probs.clear()
+        self.entrops.clear()

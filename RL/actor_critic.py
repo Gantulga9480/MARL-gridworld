@@ -26,8 +26,8 @@ class ActorCriticAgent(DeepAgent):
                      critic: torch.nn.Module,
                      actor_lr: float,
                      critic_lr: float,
-                     y: float,
                      entropy_lr: float,
+                     y: float,
                      reward_norm_factor: float = 1.0):
         self.y = y
         self.entropy_lr = entropy_lr
@@ -56,9 +56,9 @@ class ActorCriticAgent(DeepAgent):
         action = distribution.sample()
         log_prob = distribution.log_prob(action)
         entropy = distribution.entropy()
+        value = self.critic(state)
         self.log_probs.append(log_prob)
         self.entrops.append(entropy)
-        value = self.critic(state)
         self.values.append(value)
         return action.item()
 
