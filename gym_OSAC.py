@@ -40,7 +40,7 @@ ENV_NAME = "CartPole-v1"
 TRAIN_ID = "OSAC_rewards_itr5"
 env = gym.make(ENV_NAME, render_mode=None)
 agent = OneStepActorCriticAgent(env.observation_space.shape[0], env.action_space.n, device="cuda:0")
-agent.create_model(Actor, Critic, actor_lr=0.001, critic_lr=0.001, y=0.99)
+agent.create_model(Actor, Critic, actor_lr=0.001, critic_lr=0.001, entropy_coef=0.5, y=0.99)
 
 try:
     while agent.episode_count < 1000:

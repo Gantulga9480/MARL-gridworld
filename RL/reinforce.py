@@ -12,15 +12,15 @@ class ReinforceAgent(DeepAgent):
         self.entrops = []
         self.eps = np.finfo(np.float32).eps.item()
         self.reward_norm_factor = 1.0
-        self.entropy_lr = 0.1
+        self.entropy_coef = 0.1
 
     def create_model(self,
                      model: torch.nn.Module,
                      lr: float,
-                     entropy_lr: float,
+                     entropy_coef: float,
                      y: float, reward_norm_factor: float = 1.0):
         self.reward_norm_factor = reward_norm_factor
-        self.entropy_lr = entropy_lr
+        self.entropy_coef = entropy_coef
         return super().create_model(model, lr, y)
 
     def policy(self, state):
@@ -67,7 +67,7 @@ class ReinforceAgent(DeepAgent):
 
         LOG = torch.cat(self.log_probs)
         ENTROPY = torch.cat(self.entrops).mean()
-        loss = -LOG @ G.T + 0.5 * ENTROPY
+        loss = -(LOG * G).mean() + self.entropy_coef * ENTROPY
 
         self.optimizer.zero_grad()
         loss.backward()

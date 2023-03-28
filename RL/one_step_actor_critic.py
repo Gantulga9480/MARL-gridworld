@@ -11,15 +11,25 @@ class OneStepActorCriticAgent(DeepAgent):
         self.actor = None
         self.critic = None
         self.LOG = None
+        self.ENTROPY = None
         self.eps = np.finfo(np.float32).eps.item()
         self.loss_fn = torch.nn.HuberLoss(reduction="sum")
         self.i = 1
         self.reward_norm_factor = 1.0
+        self.entropy_coef = 0.1
         del self.model
         del self.optimizer
         del self.lr
 
-    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, actor_lr: float, critic_lr: float, y: float, reward_norm_factor: float = 1.0):
+    def create_model(self,
+                     actor: torch.nn.Module,
+                     critic: torch.nn.Module,
+                     actor_lr: float,
+                     critic_lr: float,
+                     entropy_coef: float,
+                     y: float,
+                     reward_norm_factor: float = 1.0):
+        self.entropy_coef = entropy_coef
         self.y = y
         self.reward_norm_factor = reward_norm_factor
         self.actor = actor(self.state_space_size, self.action_space_size)
@@ -46,6 +56,7 @@ class OneStepActorCriticAgent(DeepAgent):
         distribution = Categorical(probs)
         action = distribution.sample()
         self.LOG = distribution.log_prob(action)
+        self.ENTROPY = distribution.entropy()
         return action.item()
 
     def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool):
@@ -66,8 +77,8 @@ class OneStepActorCriticAgent(DeepAgent):
         state = torch.tensor(state).float().to(self.device)
         next_state = torch.tensor(next_state).float().to(self.device)
 
-        # Bug? It doesn't seem to need to compute computational graph when forwarding next_state.
-        # But skipping that part breaks learning. Weird!
+        # Bug? It doesn't seem to need to compute grad when forwarding next_state.
+        # But skipping grad breaks learning. Weird!
         # with torch.no_grad():
         # Next state value
         V_ = (1.0 - done) * self.critic(next_state)
@@ -75,7 +86,7 @@ class OneStepActorCriticAgent(DeepAgent):
         V = self.critic(state)
 
         # Expected return
-        G = reward / self.reward_norm_factor + self.y * V_
+        G = reward + self.y * V_
 
         critic_loss = self.loss_fn(V, G)
         critic_loss *= self.i
@@ -87,7 +98,7 @@ class OneStepActorCriticAgent(DeepAgent):
         # Swapping position for no negative sign on actor_loss
         # TD error/Advantage
         A = V.item() - G.item()
-        actor_loss = self.LOG * A
+        actor_loss = self.LOG * A + self.entropy_coef * self.ENTROPY
         actor_loss *= self.i
 
         self.actor_optimizer.zero_grad()

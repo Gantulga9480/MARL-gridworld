@@ -39,8 +39,8 @@ class Critic(nn.Module):
 ENV_NAME = "CartPole-v1"
 TRAIN_ID = "ac_rewards_norm_loss_mean_itr5"
 env = gym.make(ENV_NAME, render_mode=None)
-agent = ActorCriticAgent(4, 2, device="cuda:0")
-agent.create_model(Actor, Critic, actor_lr=0.001, critic_lr=0.001, y=0.99, entropy_lr=0.0, reward_norm_factor=1)
+agent = ActorCriticAgent(env.observation_space.shape[0], env.action_space.n, device="cuda:0")
+agent.create_model(Actor, Critic, actor_lr=0.001, critic_lr=0.001, entropy_coef=0.1, y=0.99, reward_norm_factor=1)
 
 try:
     while agent.episode_count < 1000:
