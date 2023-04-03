@@ -126,7 +126,7 @@ class GridEnv(Game):
         return self.get_state(), REWARDS[res], self.over
 
     def get_state(self):
-        return self.get_state_dqn()
+        return self.get_state_q()
 
     def get_state_dqn(self):
         up = self.board[self.agent_location[0] - 1, self.agent_location[1]] / 4

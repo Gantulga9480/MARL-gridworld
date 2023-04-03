@@ -63,32 +63,29 @@ class OneStepActorCriticAgent(DeepAgent):
         self.actor.train()
 
         reward /= self.reward_norm_factor
-        state = torch.tensor(state, dtype=torch.float32).to(self.device)
-        next_state = torch.tensor(next_state, dtype=torch.float32).to(self.device)
+        state = torch.tensor(state).float().to(self.device)
+        next_state = torch.tensor(next_state).float().to(self.device)
 
         # Bug? It doesn't seem to need to compute computational graph when forwarding next_state.
-        # But skipping that part breaks learning. Weird!
-        # with torch.no_grad():
+        # But skipping that part with torch.no_grad() breaks learning. Weird!
         # Next state value
+        # with torch.no_grad():
         V_ = (1.0 - done) * self.critic(next_state)
+        # Expected return from current state
+        G = reward + self.y * V_.detach()
         # Current state value
         V = self.critic(state)
 
-        # Expected return
-        G = reward / self.reward_norm_factor + self.y * V_
+        # TD error/Advantage
+        A = G.detach() - (1.0 - done) * V.detach()
 
-        critic_loss = self.loss_fn(V, G)
-        critic_loss *= self.i
+        critic_loss = A * self.i * self.loss_fn(V, G)
 
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
         self.critic_optimizer.step()
 
-        # Swapping position for no negative sign on actor_loss
-        # TD error/Advantage
-        A = V.item() - G.item()
-        actor_loss = self.LOG * A
-        actor_loss *= self.i
+        actor_loss = A * self.i * -self.LOG
 
         self.actor_optimizer.zero_grad()
         actor_loss.backward()

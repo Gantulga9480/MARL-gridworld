@@ -15,12 +15,14 @@ class ActorCriticAgent(DeepAgent):
         self.eps = np.finfo(np.float32).eps.item()
         self.loss_fn = torch.nn.HuberLoss(reduction='sum')
         self.reward_norm_factor = 1.0
+        self.gae_lambda = 1.0
         del self.model
         del self.optimizer
         del self.lr
 
-    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, actor_lr: float, critic_lr: float, y: float, reward_norm_factor: float = 1.0):
+    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, actor_lr: float, critic_lr: float, y: float, gae_lambda: float, reward_norm_factor: float = 1.0):
         self.y = y
+        self.gae_lambda = gae_lambda
         self.reward_norm_factor = reward_norm_factor
         self.actor = actor(self.state_space_size, self.action_space_size)
         self.actor.to(self.device)
@@ -64,21 +66,13 @@ class ActorCriticAgent(DeepAgent):
     def update_model(self):
         self.train_count += 1
         self.actor.train()
-        g = np.array(self.rewards, dtype=np.float32)
-        g /= self.reward_norm_factor
-        r_sum = 0
-        for i in reversed(range(g.shape[0])):
-            g[i] = r_sum = r_sum * self.y + g[i]
-        G = torch.tensor(g).unsqueeze(0).to(self.device)
-        G -= G.mean()
-        G /= (G.std() + self.eps)
 
         V = torch.cat(self.values, dim=1)
-        # swapping position for no negative sign on actor_loss
-        A = V.detach() - G
+        A = torch.tensor(self.GAE()).to(self.device)
+        G = A + V.detach()
 
         LOG = torch.cat(self.log_probs)
-        actor_loss = LOG @ A.T
+        actor_loss = -(LOG * A).sum()
         critic_loss = self.loss_fn(V, G)
 
         self.actor_optimizer.zero_grad()
@@ -91,3 +85,16 @@ class ActorCriticAgent(DeepAgent):
 
         self.log_probs.clear()
         self.values.clear()
+
+    def GAE(self):
+        rewards = np.array([self.rewards], dtype=np.float32)
+        rewards /= self.reward_norm_factor
+        advantages = np.zeros_like(rewards)
+        last_advantage = 0
+        next_value = 0
+        for i in reversed(range(rewards.shape[1])):
+            current_value = self.values[i].item()
+            delta = rewards[:, i] + self.y * next_value - current_value
+            advantages[:, i] = last_advantage = delta + self.y * self.gae_lambda * last_advantage
+            next_value = current_value
+        return advantages
