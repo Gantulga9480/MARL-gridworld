@@ -91,6 +91,7 @@ class DeepDeterministicPolicyGradientAgent(DeepAgent):
         next_states = torch.tensor(ns).float().to(self.device)
         rewards = torch.tensor(r).float().view(self.batch, 1).to(self.device)
         dones = torch.tensor(d).float().view(self.batch, 1).to(self.device)
+
         with torch.no_grad():
             y = rewards + (1 - dones) * self.y * self.target_critic(next_states, self.target_actor(next_states))
 

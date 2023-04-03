@@ -49,9 +49,9 @@ class Critic(nn.Module):
 
 ENV_NAME = "InvertedPendulum-v4"
 env = gym.make(ENV_NAME, render_mode=None)
-agent = DDPGAgent(4, 1, device="cuda:0")
+agent = DDPGAgent(env.observation_space.shape[0], env.action_space.n, device="cuda:0")
 agent.create_model(Actor, Critic, actor_lr=0.0001, critic_lr=0.0001, y=0.99, noise_std=0.1, batch=64, tau=0.01)
-agent.create_buffer(ReplayBuffer(1_000_000, 1000, 4, 1))
+agent.create_buffer(ReplayBuffer(1_000_000, 1000, env.observation_space.shape[0], env.action_space.n))
 
 try:
     while agent.episode_count < 1000:

@@ -11,15 +11,25 @@ class OneStepActorCriticAgent(DeepAgent):
         self.actor = None
         self.critic = None
         self.LOG = None
+        self.ENTROPY = None
         self.eps = np.finfo(np.float32).eps.item()
         self.loss_fn = torch.nn.HuberLoss(reduction="sum")
         self.i = 1
         self.reward_norm_factor = 1.0
+        self.entropy_coef = 0.1
         del self.model
         del self.optimizer
         del self.lr
 
-    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, actor_lr: float, critic_lr: float, y: float, reward_norm_factor: float = 1.0):
+    def create_model(self,
+                     actor: torch.nn.Module,
+                     critic: torch.nn.Module,
+                     actor_lr: float,
+                     critic_lr: float,
+                     entropy_coef: float,
+                     y: float,
+                     reward_norm_factor: float = 1.0):
+        self.entropy_coef = entropy_coef
         self.y = y
         self.reward_norm_factor = reward_norm_factor
         self.actor = actor(self.state_space_size, self.action_space_size)
@@ -41,10 +51,12 @@ class OneStepActorCriticAgent(DeepAgent):
                 distribution = Categorical(probs)
                 action = distribution.sample()
             return action.item()
+        self.actor.train()
         probs = self.actor(state)
         distribution = Categorical(probs)
         action = distribution.sample()
         self.LOG = distribution.log_prob(action)
+        self.ENTROPY = distribution.entropy()
         return action.item()
 
     def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool):
@@ -60,7 +72,6 @@ class OneStepActorCriticAgent(DeepAgent):
 
     def update_model(self, state, next_state, reward, done):
         self.train_count += 1
-        self.actor.train()
 
         reward /= self.reward_norm_factor
         state = torch.tensor(state).float().to(self.device)

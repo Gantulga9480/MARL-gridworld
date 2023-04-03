@@ -11,18 +11,29 @@ class ActorCriticAgent(DeepAgent):
         self.actor = None
         self.critic = None
         self.log_probs = []
+        self.entrops = []
         self.values = []
         self.eps = np.finfo(np.float32).eps.item()
-        self.loss_fn = torch.nn.HuberLoss(reduction='sum')
+        self.loss_fn = torch.nn.HuberLoss(reduction='mean')
         self.reward_norm_factor = 1.0
         self.gae_lambda = 1.0
+        self.entropy_coef = 0.1
         del self.model
         del self.optimizer
         del self.lr
 
-    def create_model(self, actor: torch.nn.Module, critic: torch.nn.Module, actor_lr: float, critic_lr: float, y: float, gae_lambda: float, reward_norm_factor: float = 1.0):
+    def create_model(self,
+                     actor: torch.nn.Module,
+                     critic: torch.nn.Module,
+                     actor_lr: float,
+                     critic_lr: float,
+                     entropy_coef: float,
+                     y: float,
+                     gae_lambda: float,
+                     reward_norm_factor: float = 1.0):
         self.y = y
         self.gae_lambda = gae_lambda
+        self.entropy_coef = entropy_coef
         self.reward_norm_factor = reward_norm_factor
         self.actor = actor(self.state_space_size, self.action_space_size)
         self.actor.to(self.device)
@@ -47,8 +58,10 @@ class ActorCriticAgent(DeepAgent):
         distribution = Categorical(probs)
         action = distribution.sample()
         log_prob = distribution.log_prob(action)
-        self.log_probs.append(log_prob)
+        entropy = distribution.entropy()
         value = self.critic(state)
+        self.log_probs.append(log_prob)
+        self.entrops.append(entropy)
         self.values.append(value)
         return action.item()
 
@@ -72,7 +85,9 @@ class ActorCriticAgent(DeepAgent):
         G = A + V.detach()
 
         LOG = torch.cat(self.log_probs)
-        actor_loss = -(LOG * A).sum()
+        ENTROPY = torch.cat(self.entrops).sum()
+
+        actor_loss = -(LOG * A).sum() + self.entropy_coef * ENTROPY
         critic_loss = self.loss_fn(V, G)
 
         self.actor_optimizer.zero_grad()
@@ -85,6 +100,7 @@ class ActorCriticAgent(DeepAgent):
 
         self.log_probs.clear()
         self.values.clear()
+        self.entrops.clear()
 
     def GAE(self):
         rewards = np.array([self.rewards], dtype=np.float32)

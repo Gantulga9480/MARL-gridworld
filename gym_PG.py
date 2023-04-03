@@ -25,8 +25,8 @@ class PG(nn.Module):
 ENV_NAME = "CartPole-v1"
 TRAIN_ID = "ri_rewards_sum"
 env = gym.make(ENV_NAME, render_mode=None)
-agent = ReinforceAgent(4, 2, device="cuda:0")
-agent.create_model(PG, lr=0.001, y=0.99)
+agent = ReinforceAgent(env.observation_space.shape[0], env.action_space.n, device="cuda:0")
+agent.create_model(PG, lr=0.0001, entropy_coef=0.7, y=0.99)
 
 try:
     while agent.episode_count < 1000:
