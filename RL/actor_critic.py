@@ -44,9 +44,12 @@ class ActorCriticAgent(DeepAgent):
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=actor_lr)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=critic_lr)
 
-    def policy(self, state):
+    def policy(self, state: np.ndarray):
         self.step_count += 1
-        state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(self.device)
+        if state.ndim == 1:
+            state = torch.tensor(state).float().unsqueeze(0).to(self.device)
+        else:
+            state = torch.tensor(state).float().to(self.device)
         if not self.training:
             self.actor.eval()
             with torch.no_grad():
