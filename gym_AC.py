@@ -4,8 +4,9 @@ import numpy as np
 from RL.actor_critic import ActorCriticAgent
 import gym
 import matplotlib.pyplot as plt
-torch.manual_seed(3407)
-torch.cuda.manual_seed(3407)
+# torch.manual_seed(3407)
+# torch.cuda.manual_seed(3407)
+# np.random.seed(3407)
 
 
 class Actor(nn.Module):
