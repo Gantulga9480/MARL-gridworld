@@ -27,11 +27,11 @@ class ActorCriticAgent(DeepAgent):
                      critic: torch.nn.Module,
                      actor_lr: float,
                      critic_lr: float,
+                     gamma: float,
                      entropy_coef: float,
-                     y: float,
                      gae_lambda: float,
                      reward_norm_factor: float = 1.0):
-        self.y = y
+        self.gamma = gamma
         self.gae_lambda = gae_lambda
         self.entropy_coef = entropy_coef
         self.reward_norm_factor = reward_norm_factor
@@ -45,7 +45,7 @@ class ActorCriticAgent(DeepAgent):
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=critic_lr)
 
     def policy(self, state: np.ndarray):
-        self.step_count += 1
+        self.step_counter += 1
         if state.ndim == 1:
             state = torch.tensor(state).float().unsqueeze(0).to(self.device)
         else:
@@ -56,7 +56,7 @@ class ActorCriticAgent(DeepAgent):
                 probs = self.actor(state)
                 distribution = Categorical(probs)
                 action = distribution.sample()
-            return action.item()
+            return action.cpu().numpy()
         probs = self.actor(state)
         distribution = Categorical(probs)
         action = distribution.sample()
@@ -66,17 +66,17 @@ class ActorCriticAgent(DeepAgent):
         self.log_probs.append(log_prob)
         self.entrops.append(entropy)
         self.values.append(value)
-        return action.item()
+        return action.cpu().numpy()
 
-    def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, episode_over: bool):
+    def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, done: bool):
         self.rewards.append(reward)
-        if episode_over:
-            self.step_count = 0
+        if done:
+            self.step_counter = 0
             self.reward_history.append(np.sum(self.rewards))
             if len(self.rewards) > 1:
-                self.episode_count += 1
+                self.episode_counter += 1
                 self.update_model()
-                print(f"Episode: {self.episode_count} | Train: {self.train_count} | r: {self.reward_history[-1]:.6f}")
+                print(f"Episode: {self.episode_counter} | Train: {self.train_count} | r: {self.reward_history[-1]:.6f}")
             self.rewards.clear()
 
     def update_model(self):
@@ -90,15 +90,15 @@ class ActorCriticAgent(DeepAgent):
         LOG = torch.cat(self.log_probs)
         ENTROPY = torch.cat(self.entrops).sum()
 
-        actor_loss = -(LOG * A).sum() + self.entropy_coef * ENTROPY
-        critic_loss = self.loss_fn(V, G)
+        self.actor_loss = -(LOG * A).sum() + self.entropy_coef * ENTROPY
+        self.critic_loss = self.loss_fn(V, G)
 
         self.actor_optimizer.zero_grad()
-        actor_loss.backward()
+        self.actor_loss.backward()
         self.actor_optimizer.step()
 
         self.critic_optimizer.zero_grad()
-        critic_loss.backward()
+        self.critic_loss.backward()
         self.critic_optimizer.step()
 
         self.log_probs.clear()
@@ -113,7 +113,7 @@ class ActorCriticAgent(DeepAgent):
         next_value = 0
         for i in reversed(range(rewards.shape[1])):
             current_value = self.values[i].item()
-            delta = rewards[:, i] + self.y * next_value - current_value
-            advantages[:, i] = last_advantage = delta + self.y * self.gae_lambda * last_advantage
+            delta = rewards[:, i] + self.gamma * next_value - current_value
+            advantages[:, i] = last_advantage = delta + self.gamma * self.gae_lambda * last_advantage
             next_value = current_value
         return advantages

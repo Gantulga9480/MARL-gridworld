@@ -40,14 +40,14 @@ ENV_NAME = "CartPole-v1"
 TRAIN_ID = "ac_rewards_norm_loss_mean_itr5"
 env = gym.make(ENV_NAME, render_mode=None)
 agent = ActorCriticAgent(env.observation_space.shape[0], env.action_space.n, device="cuda:0")
-agent.create_model(Actor, Critic, actor_lr=0.001, critic_lr=0.001, entropy_coef=0.1, y=0.99, gae_lambda=1, reward_norm_factor=1)
+agent.create_model(Actor, Critic, actor_lr=0.001, critic_lr=0.001, gamma=0.99, entropy_coef=0.1, gae_lambda=1, reward_norm_factor=1)
 
 try:
-    while agent.episode_count < 1000:
+    while agent.episode_counter < 1000:
         done = False
         s, i = env.reset()
         while not done:
-            a = agent.policy(s)
+            a = agent.policy(s)[0]
             ns, r, d, t, i = env.step(a)
             done = d or t
             agent.learn(s, a, ns, r, done)
