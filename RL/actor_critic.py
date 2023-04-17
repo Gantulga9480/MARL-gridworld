@@ -61,12 +61,10 @@ class ActorCriticAgent(DeepAgent):
         probs = self.actor(state)
         distribution = Categorical(probs)
         action = distribution.sample()
-        if not self.training:
-            return action.cpu().numpy()[0]
         return action.cpu().numpy()
 
     def learn(self, state: np.ndarray, action: np.ndarray, next_state: np.ndarray, reward: np.ndarray, done: np.ndarray):
-        self.rewards.append(np.mean(reward))
+        self.rewards.append(np.max(reward))
         self.state_buffer[:, self.step_counter - 1] = np.copy(state)
         self.action_buffer[:, self.step_counter - 1] = np.copy(action)
         self.reward_buffer[:, self.step_counter - 1] = np.copy(reward)
