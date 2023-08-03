@@ -37,7 +37,7 @@ agent.create_buffer(ReplayBuffer(1_000_000, 1000, 4))
 agent.e = 0.01
 
 try:
-    while agent.episode_count < 1000:
+    while agent.episode_counter < 1000:
         done = False
         s, info = env.reset(seed=3407)
         while not done:

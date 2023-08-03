@@ -33,7 +33,7 @@ class QLearningAgent(Agent):
         if not done:
             max_future_q_value = np.max(self.model[next_state])
             current_q_value = self.model[state][action]
-            new_q_value = current_q_value + self.lr * (reward + self.y * max_future_q_value - current_q_value)
+            new_q_value = current_q_value + self.lr * (reward + self.gamma * max_future_q_value - current_q_value)
             self.model[state][action] = new_q_value
         else:
             self.model[state][action] = reward

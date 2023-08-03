@@ -43,7 +43,7 @@ agent = OneStepActorCriticAgent(env.observation_space.shape[0], env.action_space
 agent.create_model(Actor, Critic, actor_lr=0.001, critic_lr=0.001, entropy_coef=0.5, y=0.99)
 
 try:
-    while agent.episode_count < 1000:
+    while agent.episode_counter < 1000:
         done = False
         s, i = env.reset(seed=3407)
         while not done:

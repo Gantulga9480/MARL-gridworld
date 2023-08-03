@@ -40,7 +40,7 @@ class Critic(nn.Module):
 
 ENV_NAME = "CartPole-v1"
 TRAIN_ID = "ac_rewards_norm_loss_mean_itr5"
-ENV_COUNT = 3
+ENV_COUNT = 1
 envs = [gym.make(ENV_NAME, render_mode=None) for _ in range(ENV_COUNT)]
 agent = ActorCriticAgent(envs[0].observation_space.shape[0], envs[0].action_space.n, device="cuda:0")
 agent.create_model(Actor, Critic, actor_lr=0.001, critic_lr=0.001, gamma=0.99, entropy_coef=0.1, gae_lambda=1, env_count=ENV_COUNT, step_count=500, reward_norm_factor=1)
@@ -83,6 +83,6 @@ for _ in range(10):
     done = False
     state, _ = env.reset()
     while not done:
-        action = agent.policy(state)
+        action = agent.policy(state)[0]
         state, _, d, t, _ = env.step(action)
         done = d or t

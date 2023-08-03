@@ -29,7 +29,7 @@ class DQN(nn.Module):
 
 env = GridEnv(env_file="boards/board3.csv")
 agent = DeepQNetworkAgent(env.observation_size, env.action_space_size, device="cuda:0")
-agent.create_model(DQN, lr=0.0001, y=0.99, e_decay=0.9995, batchs=64)
+agent.create_model(DQN, lr=0.0001, gamma=0.99, e_decay=0.9995, batch=64)
 agent.create_buffer(ReplayBuffer(1_000_000, 1000, env.observation_size))
 
 while env.running:

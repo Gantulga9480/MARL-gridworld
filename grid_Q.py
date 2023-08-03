@@ -3,7 +3,7 @@ from RL import QLearningAgent
 
 environment = GridEnv(env_file="boards/board3.csv")
 agent = QLearningAgent(environment.state_space_size, environment.action_space_size)
-agent.create_model(lr=0.1, y=0.9, e_decay=0.999)
+agent.create_model(lr=0.1, gamma=0.9, e_decay=0.999)
 environment.model = agent.model
 
 while environment.running:

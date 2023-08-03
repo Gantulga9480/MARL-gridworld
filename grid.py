@@ -90,7 +90,7 @@ class GridEnv(Game):
 
     @property
     def observation_size(self):
-        return 6
+        return 2
 
     def reset(self, pos=None):
         self.over = False
