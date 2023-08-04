@@ -4,7 +4,7 @@ import numpy as np
 from .deep_agent import DeepAgent
 
 
-class ActorCriticAgent(DeepAgent):
+class ProximalPolicyOptimizationAgent(DeepAgent):
 
     def __init__(self, state_space_size: int, action_space_size: int, device: str = 'cpu') -> None:
         super().__init__(state_space_size, action_space_size, device)
