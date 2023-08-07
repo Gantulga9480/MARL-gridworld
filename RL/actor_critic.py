@@ -99,7 +99,7 @@ class ActorCriticAgent(DeepAgent):
                 A, G = self.VAE(last_states[i], rewards[i], V, dones[i])
             else:
                 A, G = self.GAE(last_states[i], rewards[i], V, dones[i])
-            actor_loss = (LOG * -A).mean() + ENTROPY.mean() * self.entropy_coef
+            actor_loss = (LOG * -A).mean() - ENTROPY.mean() * self.entropy_coef
             critic_loss = self.loss_fn(V, G)
 
             actor_losses.append(actor_loss)

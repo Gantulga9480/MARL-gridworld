@@ -15,7 +15,11 @@ class ProximalPolicyOptimizationAgent(DeepAgent):
         self.reward_norm_factor = 1.0
         self.gae_lambda = 1.0
         self.entropy_coef = 0.1
-        self.step_count = 1
+        self.clip_coef = 0.2
+        self.kl_threshold = 0.02
+        self.step_count = 0
+        self.batch = 0
+        self.epoch = 0
         del self.model
         del self.optimizer
         del self.lr
@@ -27,13 +31,21 @@ class ProximalPolicyOptimizationAgent(DeepAgent):
                      critic_lr: float,
                      gamma: float,
                      entropy_coef: float,
+                     clip_coef: float,
+                     kl_threshold: float,
                      gae_lambda: float,
                      step_count: int,
+                     batch: int,
+                     epoch: int,
                      reward_norm_factor: float = 1.0):
         self.gamma = gamma
         self.gae_lambda = gae_lambda
         self.entropy_coef = entropy_coef
+        self.clip_coef = clip_coef
+        self.kl_threshold = kl_threshold
         self.step_count = step_count
+        self.batch = batch
+        self.epoch = epoch
         self.reward_norm_factor = reward_norm_factor
         self.actor = actor(self.state_space_size, self.action_space_size)
         self.actor.to(self.device)
@@ -41,11 +53,14 @@ class ProximalPolicyOptimizationAgent(DeepAgent):
         self.critic = critic(self.state_space_size)
         self.critic.to(self.device)
         self.critic.train()
-        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=actor_lr)
-        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=critic_lr)
-        self.state_buffer = np.zeros((step_count, self.state_space_size))
-        self.action_buffer = np.zeros(step_count)
-        self.reward_buffer = np.zeros(step_count)
+        self.optimizer = torch.optim.Adam([
+            {'params': self.actor.parameters(), 'lr': actor_lr},
+            {'params': self.critic.parameters(), 'lr': critic_lr}
+        ])
+        self.state_buffer = []
+        self.action_buffer = []
+        self.reward_buffer = []
+        self.done_buffer = []
         self.log_prob_buffer = []
         self.value_buffer = []
 
@@ -55,89 +70,120 @@ class ProximalPolicyOptimizationAgent(DeepAgent):
             state = torch.tensor(state).float().unsqueeze(0).to(self.device)
         else:
             state = torch.tensor(state).float().to(self.device)
+
         if not self.training:
             self.actor.eval()
-            with torch.no_grad():
-                probs = self.actor(state)
-                distribution = Categorical(probs)
-                action = distribution.sample()
-            return action.cpu().numpy()[0]
-        self.actor.train()
-        self.critic.train()
-        probs = self.actor(state)[0]
-        distribution = Categorical(probs)
-        action = distribution.sample()
-        log_prob = distribution.log_prob(action)
-        value = self.critic(state)
+        else:
+            self.actor.train()
+
+        with torch.no_grad():
+            probs = self.actor(state).squeeze(0)
+            distribution = Categorical(probs)
+            action = distribution.sample()
+
+        if not self.training:
+            return int(action.cpu().numpy())
+
+        with torch.no_grad():
+            log_prob = distribution.log_prob(action)
+            value = self.critic(state).squeeze(0)
         self.log_prob_buffer.append(log_prob)
         self.value_buffer.append(value)
-        return action.cpu().numpy()[0]
+        return int(action.cpu().numpy())
 
-    def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: np.ndarray, done: bool):
-        self.rewards.append(np.max(reward))
-        self.state_buffer[:, self.step_counter - 1] = np.copy(state)
-        self.action_buffer[:, self.step_counter - 1] = np.copy(action)
-        self.reward_buffer[:, self.step_counter - 1] = np.copy(reward)
+    def learn(self, state: np.ndarray, action: int, next_state: np.ndarray, reward: float, done: bool):
+        self.rewards.append(reward)
+        self.state_buffer.append(np.copy(state))
+        self.action_buffer.append(action)
+        self.reward_buffer.append(reward)
+        self.done_buffer.append(done)
         if done:
-            self.update_model(next_state, done)
             self.step_counter = 0
             self.episode_counter += 1
             self.reward_history.append(np.sum(self.rewards))
             self.rewards.clear()
             print(f"Episode: {self.episode_counter} | Train: {self.train_count} | r: {self.reward_history[-1]:.6f}")
+        if len(self.done_buffer) == self.step_count:
+            self.update_model(next_state)
+            self.state_buffer.clear()
+            self.action_buffer.clear()
+            self.reward_buffer.clear()
+            self.done_buffer.clear()
+            self.log_prob_buffer.clear()
+            self.value_buffer.clear()
 
-    def update_model(self, last_state, done):
+    def update_model(self, last_state):
         self.train_count += 1
-        self.actor.train()
 
-        states = torch.tensor(self.state_buffer[:self.step_counter]).float().to(self.device)
-        actions = torch.tensor(self.action_buffer[:self.step_counter]).to(self.device)
-        rewards = torch.tensor(self.reward_buffer[:self.step_counter]).float().to(self.device)
-        last_states = torch.tensor(last_states).float().to(self.device)
-        dones = 1 - done
-        rewards /= self.reward_norm_factor
+        b_states = torch.tensor(np.array(self.state_buffer)).float().to(self.device)
+        b_actions = torch.tensor(self.action_buffer).to(self.device)
+        b_rewards = torch.tensor(self.reward_buffer).float().to(self.device)
+        b_dones = 1 - torch.tensor(self.done_buffer).long().to(self.device)
+        b_rewards /= self.reward_norm_factor
+        b_log_probs = torch.stack(self.log_prob_buffer).to(self.device).view(-1)
+        b_values = torch.stack(self.value_buffer).to(self.device).view(-1)
+        b_advantage, b_return = self.GAE(last_state, b_dones, b_rewards, b_values)
 
-        
+        b_inds = np.arange(self.step_count)
 
-        actor_losses = []
-        critic_losses = []
-
-        for i in range(self.env_count):
-            probs = self.actor(states[i])
-            dist = Categorical(probs=probs)
-            ENTROPY = dist.entropy()
-            LOG = dist.log_prob(actions[i])
-            V = self.critic(states[i]).view(-1)
-            if self.gae_lambda == 1.0:
-                A, G = self.VAE(last_states[i], rewards[i], V, dones[i])
+        for _ in range(self.epoch):
+            if self.step_count <= self.batch:
+                mb_inds = b_inds
             else:
-                A, G = self.GAE(last_states[i], rewards[i], V, dones[i])
-            actor_loss = (LOG * -A).mean() + ENTROPY.mean() * self.entropy_coef
-            critic_loss = self.loss_fn(V, G)
+                mb_inds = np.random.choice(b_inds, self.batch, False)
 
-            actor_losses.append(actor_loss)
-            critic_losses.append(critic_loss)
+            distribution = Categorical(probs=self.actor(b_states[mb_inds]))
+            LOG = distribution.log_prob(b_actions[mb_inds])
 
-        actor_loss = torch.stack(actor_losses).mean()
-        critic_loss = torch.stack(critic_losses).mean()
+            ENTROPY = distribution.entropy()
 
-        self.actor_optimizer.zero_grad()
-        actor_loss.backward()
-        self.actor_optimizer.step()
+            log_ratio = LOG - b_log_probs[mb_inds]
+            RATIO = log_ratio.exp()
 
-        self.critic_optimizer.zero_grad()
-        critic_loss.backward()
-        self.critic_optimizer.step()
+            V = self.critic(b_states[mb_inds]).view(-1)
+
+            with torch.no_grad():
+                approx_kl = ((RATIO - 1) - log_ratio).mean()
+
+            mb_advantage = b_advantage[mb_inds]
+            actor_loss1 = mb_advantage * RATIO
+            actor_loss2 = mb_advantage * torch.clamp(RATIO, 1 - self.clip_coef, 1 + self.clip_coef)
+            actor_loss = -torch.min(actor_loss1, actor_loss2).mean()
+
+            entropy_loss = ENTROPY.mean()
+
+            actor_loss = actor_loss - entropy_loss * self.entropy_coef
+
+            critic_loss = self.loss_fn(V, b_return[mb_inds])
+
+            loss = actor_loss + critic_loss
+
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+
+            if approx_kl >= self.kl_threshold:
+                print('break')
+                break
 
     @torch.no_grad()
-    def GAE(self, last_state, rewards, values, done):
-        advantages = torch.zeros_like(rewards)
+    def GAE(self, last_state, dones, rewards, values):
+        advantages = torch.zeros_like(rewards).to(self.device)
+        future_value = self.critic(torch.from_numpy(last_state).float().to(self.device)) * dones[self.step_count - 1]
         last_advantage = 0
-        for i in reversed(range(self.step_counter)):
-            if i == self.step_counter - 1:
-                delta = rewards[i] + self.gamma * self.critic(last_state) * done - values[i]
+        for i in reversed(range(self.step_count)):
+            if not dones[i]:
+                if i == self.step_count - 1:
+                    pass
+                else:
+                    future_value = 0
+                    last_advantage = 0
             else:
-                delta = rewards[i] + self.gamma * values[i + 1] - values[i]
+                if i == self.step_count - 1:
+                    pass
+                else:
+                    future_value = values[i + 1]
+            delta = rewards[i] + self.gamma * future_value - values[i]
             advantages[i] = last_advantage = delta + self.gamma * self.gae_lambda * last_advantage
         returns = advantages + values
         return advantages, returns

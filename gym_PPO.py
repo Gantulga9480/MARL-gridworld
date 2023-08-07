@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from RL.actor_critic import ActorCriticAgent
+from RL.ppo import ProximalPolicyOptimizationAgent as PPO
 import gym
 import matplotlib.pyplot as plt
-# torch.manual_seed(3407)
-# torch.cuda.manual_seed(3407)
-# np.random.seed(3407)
+torch.manual_seed(3407)
+torch.cuda.manual_seed(3407)
+np.random.seed(3407)
 
 
 class Actor(nn.Module):
@@ -39,33 +39,33 @@ class Critic(nn.Module):
 
 
 ENV_NAME = "CartPole-v1"
-TRAIN_ID = "ac_rewards_norm_loss_mean_itr5"
-ENV_COUNT = 1
-envs = [gym.make(ENV_NAME, render_mode=None) for _ in range(ENV_COUNT)]
-agent = ActorCriticAgent(envs[0].observation_space.shape[0], envs[0].action_space.n, device="cuda:0")
-agent.create_model(Actor, Critic, actor_lr=0.001, critic_lr=0.001, gamma=0.99, entropy_coef=0.1, gae_lambda=1, env_count=ENV_COUNT, step_count=500, reward_norm_factor=1)
+TRAIN_ID = "ppo_rewards_norm_loss_mean"
+env = gym.make(ENV_NAME, render_mode=None)
+agent = PPO(env.observation_space.shape[0], env.action_space.n, device="cuda:0")
+agent.create_model(Actor,
+                   Critic,
+                   actor_lr=0.0003,
+                   critic_lr=0.001,
+                   gamma=0.99,
+                   entropy_coef=0.01,
+                   clip_coef=0.2,
+                   kl_threshold=0.02,
+                   gae_lambda=0.95,
+                   step_count=500,
+                   batch=100,
+                   epoch=500,
+                   reward_norm_factor=1)
 
-states = np.zeros((ENV_COUNT, envs[0].observation_space.shape[0]))
-next_states = np.zeros((ENV_COUNT, envs[0].observation_space.shape[0]))
-rewards = np.zeros(ENV_COUNT)
-dones = np.zeros(ENV_COUNT)
 try:
     while agent.episode_counter < 1000:
-        for i, env in enumerate(envs):
-            s, _ = env.reset()
-            states[i] = s
-            dones[i] = 0
-        while not any(dones):
-            actions = agent.policy(states)
-            for i, env in enumerate(envs):
-                rewards[i] = 0
-                if not dones[i]:
-                    ns, r, d, t, _ = env.step(actions[i])
-                    next_states[i] = ns
-                    rewards[i] = r
-                    dones[i] = d or t
-            agent.learn(states, actions, next_states, rewards, dones)
-            states = np.copy(next_states)
+        state, _ = env.reset()
+        done = False
+        while not done:
+            action = agent.policy(state)
+            next_state, reward, d, t, _ = env.step(action)
+            done = d or t
+            agent.learn(state, action, next_state, reward, done)
+            state = next_state
 except KeyboardInterrupt:
     pass
 env.close()
@@ -76,13 +76,16 @@ plt.show()
 
 # with open(f"results/{TRAIN_ID}.txt", "w") as f:
 #     f.writelines([str(item) + '\n' for item in agent.reward_history])
-agent.training = False
+# agent.training = False
 
 env = gym.make(ENV_NAME, render_mode="human")
-for _ in range(10):
+reward = 0
+for _ in range(1):
     done = False
     state, _ = env.reset()
     while not done:
-        action = agent.policy(state)[0]
-        state, _, d, t, _ = env.step(action)
+        action = agent.policy(state)
+        state, r, d, t, _ = env.step(action)
         done = d or t
+        reward += r
+print(reward)
