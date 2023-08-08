@@ -21,7 +21,6 @@ class ProximalPolicyOptimizationAgent(DeepAgent):
         self.batch = 0
         self.epoch = 0
         del self.model
-        del self.optimizer
         del self.lr
 
     def create_model(self,
@@ -64,29 +63,25 @@ class ProximalPolicyOptimizationAgent(DeepAgent):
         self.log_prob_buffer = []
         self.value_buffer = []
 
+    @torch.no_grad()
     def policy(self, state: np.ndarray):
+        self.actor.eval()
+
         self.step_counter += 1
         if state.ndim == 1:
-            state = torch.tensor(state).float().unsqueeze(0).to(self.device)
+            state = torch.Tensor(state).unsqueeze(0).to(self.device)
         else:
-            state = torch.tensor(state).float().to(self.device)
+            state = torch.Tensor(state).to(self.device)
 
-        if not self.training:
-            self.actor.eval()
-        else:
-            self.actor.train()
-
-        with torch.no_grad():
-            probs = self.actor(state).squeeze(0)
-            distribution = Categorical(probs)
-            action = distribution.sample()
+        probs = self.actor(state).squeeze(0)
+        distribution = Categorical(probs)
+        action = distribution.sample()
 
         if not self.training:
             return int(action.cpu().numpy())
 
-        with torch.no_grad():
-            log_prob = distribution.log_prob(action)
-            value = self.critic(state).squeeze(0)
+        log_prob = distribution.log_prob(action)
+        value = self.critic(state).squeeze(0)
         self.log_prob_buffer.append(log_prob)
         self.value_buffer.append(value)
         return int(action.cpu().numpy())
@@ -97,12 +92,6 @@ class ProximalPolicyOptimizationAgent(DeepAgent):
         self.action_buffer.append(action)
         self.reward_buffer.append(reward)
         self.done_buffer.append(done)
-        if done:
-            self.step_counter = 0
-            self.episode_counter += 1
-            self.reward_history.append(np.sum(self.rewards))
-            self.rewards.clear()
-            print(f"Episode: {self.episode_counter} | Train: {self.train_count} | r: {self.reward_history[-1]:.6f}")
         if len(self.done_buffer) == self.step_count:
             self.update_model(next_state)
             self.state_buffer.clear()
@@ -111,9 +100,15 @@ class ProximalPolicyOptimizationAgent(DeepAgent):
             self.done_buffer.clear()
             self.log_prob_buffer.clear()
             self.value_buffer.clear()
+        if done:
+            self.step_counter = 0
+            self.episode_counter += 1
+            self.reward_history.append(np.sum(self.rewards))
+            self.rewards.clear()
+            print(f"Episode: {self.episode_counter} | Train: {self.train_counter} | r: {self.reward_history[-1]:.6f}")
 
     def update_model(self, last_state):
-        self.train_count += 1
+        self.actor.train()
 
         b_states = torch.tensor(np.array(self.state_buffer)).float().to(self.device)
         b_actions = torch.tensor(self.action_buffer).to(self.device)
@@ -142,57 +137,41 @@ class ProximalPolicyOptimizationAgent(DeepAgent):
 
             V = self.critic(b_states[mb_inds]).view(-1)
 
-            with torch.no_grad():
-                approx_kl = ((RATIO - 1) - log_ratio).mean()
-
             mb_advantage = b_advantage[mb_inds]
             actor_loss1 = mb_advantage * RATIO
             actor_loss2 = mb_advantage * torch.clamp(RATIO, 1 - self.clip_coef, 1 + self.clip_coef)
-            actor_loss = -torch.min(actor_loss1, actor_loss2).mean()
+            actor_loss = torch.min(actor_loss1, actor_loss2).mean()
 
-            entropy_loss = ENTROPY.mean()
-
-            actor_loss = actor_loss - entropy_loss * self.entropy_coef
+            entropy_loss = ENTROPY.mean() * self.entropy_coef
 
             critic_loss = self.loss_fn(V, b_return[mb_inds])
 
-            loss = actor_loss + critic_loss
+            loss = -actor_loss + -entropy_loss + critic_loss
 
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
 
-            if approx_kl >= self.kl_threshold:
-                print('break')
-                break
+            self.train_counter += 1
+
+            with torch.no_grad():
+                approx_kl = ((RATIO - 1) - log_ratio).mean()
+                if approx_kl >= self.kl_threshold:
+                    print('break')
+                    break
+
+        print(f"KL: {approx_kl}")
 
     @torch.no_grad()
     def GAE(self, last_state, dones, rewards, values):
         advantages = torch.zeros_like(rewards).to(self.device)
-        future_value = self.critic(torch.from_numpy(last_state).float().to(self.device)) * dones[self.step_count - 1]
+        future_value = self.critic(torch.tensor(last_state).float().to(self.device)) * dones[self.step_count - 1]
         last_advantage = 0
         for i in reversed(range(self.step_count)):
-            if not dones[i]:
-                if i == self.step_count - 1:
-                    pass
-                else:
-                    future_value = 0
-                    last_advantage = 0
-            else:
-                if i == self.step_count - 1:
-                    pass
-                else:
-                    future_value = values[i + 1]
+            if i != self.step_count - 1:
+                future_value = values[i + 1] * dones[i]
+                last_advantage *= dones[i]
             delta = rewards[i] + self.gamma * future_value - values[i]
             advantages[i] = last_advantage = delta + self.gamma * self.gae_lambda * last_advantage
         returns = advantages + values
-        return advantages, returns
-
-    @torch.no_grad()
-    def VAE(self, last_state, rewards, values, done):
-        returns = torch.zeros_like(rewards)
-        r_sum = self.critic(last_state) * done
-        for i in reversed(range(self.step_counter)):
-            returns[i] = r_sum = r_sum * self.gamma + rewards[i]
-        advantages = returns - values
         return advantages, returns

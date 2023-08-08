@@ -49,12 +49,12 @@ class Critic(nn.Module):
 
 ENV_NAME = "InvertedPendulum-v4"
 env = gym.make(ENV_NAME, render_mode=None)
-agent = DDPGAgent(env.observation_space.shape[0], env.action_space.n, device="cuda:0")
-agent.create_model(Actor, Critic, actor_lr=0.0001, critic_lr=0.0001, y=0.99, noise_std=0.1, batch=64, tau=0.01)
-agent.create_buffer(ReplayBuffer(1_000_000, 1000, env.observation_space.shape[0], env.action_space.n))
+agent = DDPGAgent(env.observation_space.shape[0], env.action_space.shape[0], device="cuda:0")
+agent.create_model(Actor, Critic, actor_lr=0.0001, critic_lr=0.0001, gamma=0.99, noise_std=0.1, batch=64, tau=0.01)
+agent.create_buffer(ReplayBuffer(1_000_000, 1000, env.observation_space.shape[0], env.action_space.shape[0]))
 
 try:
-    while agent.episode_count < 1000:
+    while agent.episode_counter < 1000:
         done = False
         s, info = env.reset(seed=3407)
         while not done:
@@ -70,17 +70,13 @@ env.close()
 plt.plot(agent.reward_history)
 plt.show()
 
-with open(f"ddpg_rewards_0.0001_{agent.target_update_rate}.txt", "w") as f:
-    f.writelines([str(item) + '\n' for item in agent.reward_history])
-
-agent.train = False
+agent.training = False
 
 env = gym.make(ENV_NAME, render_mode="human")
-for _ in range(10):
+for _ in range(1):
     done = False
     s, i = env.reset(seed=3407)
     while not done:
         a = agent.policy(s)
         s, r, d, t, i = env.step(a)
         done = d or t
-env.close()

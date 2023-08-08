@@ -14,9 +14,11 @@ class Actor(nn.Module):
     def __init__(self, observation_size, action_size):
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(observation_size, 128),
+            nn.Linear(observation_size, 16),
             nn.LeakyReLU(),
-            nn.Linear(128, action_size),
+            nn.Linear(16, 16),
+            nn.LeakyReLU(),
+            nn.Linear(16, action_size),
             nn.Softmax(dim=1)
         )
 
@@ -29,9 +31,11 @@ class Critic(nn.Module):
     def __init__(self, observation_size) -> None:
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(observation_size, 128),
+            nn.Linear(observation_size, 16),
             nn.LeakyReLU(),
-            nn.Linear(128, 1)
+            nn.Linear(16, 16),
+            nn.LeakyReLU(),
+            nn.Linear(16, 1)
         )
 
     def forward(self, x):
@@ -44,16 +48,16 @@ env = gym.make(ENV_NAME, render_mode=None)
 agent = PPO(env.observation_space.shape[0], env.action_space.n, device="cuda:0")
 agent.create_model(Actor,
                    Critic,
-                   actor_lr=0.0003,
-                   critic_lr=0.001,
+                   actor_lr=0.003,
+                   critic_lr=0.003,
                    gamma=0.99,
-                   entropy_coef=0.01,
+                   entropy_coef=0.0,
                    clip_coef=0.2,
                    kl_threshold=0.02,
                    gae_lambda=0.95,
-                   step_count=500,
-                   batch=100,
-                   epoch=500,
+                   step_count=2000,
+                   batch=500,
+                   epoch=300,
                    reward_norm_factor=1)
 
 try:

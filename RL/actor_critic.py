@@ -74,10 +74,10 @@ class ActorCriticAgent(DeepAgent):
             self.episode_counter += 1
             self.reward_history.append(np.sum(self.rewards))
             self.rewards.clear()
-            print(f"Episode: {self.episode_counter} | Train: {self.train_count} | r: {self.reward_history[-1]:.6f}")
+            print(f"Episode: {self.episode_counter} | Train: {self.train_counter} | r: {self.reward_history[-1]:.6f}")
 
     def update_model(self, last_states, dones):
-        self.train_count += 1
+        self.train_counter += 1
         self.actor.train()
 
         states = torch.tensor(self.state_buffer[:, :self.step_counter]).float().to(self.device)
