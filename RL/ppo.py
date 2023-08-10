@@ -15,8 +15,10 @@ class ProximalPolicyOptimizationAgent(DeepAgent):
         self.reward_norm_factor = 1.0
         self.gae_lambda = 1.0
         self.entropy_coef = 0.1
+        self.vf_coef = 0.5
+        self.max_grad_norm = 0.5
         self.clip_coef = 0.2
-        self.kl_threshold = 0.02
+        self.target_kl = 0.02
         self.step_count = 0
         self.batch = 0
         self.epoch = 0
@@ -26,22 +28,26 @@ class ProximalPolicyOptimizationAgent(DeepAgent):
     def create_model(self,
                      actor: torch.nn.Module,
                      critic: torch.nn.Module,
-                     actor_lr: float,
-                     critic_lr: float,
-                     gamma: float,
-                     entropy_coef: float,
-                     clip_coef: float,
-                     kl_threshold: float,
-                     gae_lambda: float,
-                     step_count: int,
-                     batch: int,
-                     epoch: int,
+                     actor_lr: float = 0.0003,
+                     critic_lr: float = 0.0003,
+                     gamma: float = 0.99,
+                     gae_lambda: float = 0.95,
+                     entropy_coef: float = 0.01,
+                     vf_coef: float = 0.5,
+                     clip_coef: float = 0.2,
+                     target_kl: float = 0.02,
+                     max_grad_norm: float = 0.5,
+                     step_count: int = 500,
+                     batch: int = 64,
+                     epoch: int = 10,
                      reward_norm_factor: float = 1.0):
         self.gamma = gamma
         self.gae_lambda = gae_lambda
         self.entropy_coef = entropy_coef
+        self.vf_coef = vf_coef
         self.clip_coef = clip_coef
-        self.kl_threshold = kl_threshold
+        self.target_kl = target_kl
+        self.max_grad_norm = max_grad_norm
         self.step_count = step_count
         self.batch = batch
         self.epoch = epoch
@@ -66,6 +72,7 @@ class ProximalPolicyOptimizationAgent(DeepAgent):
     @torch.no_grad()
     def policy(self, state: np.ndarray):
         self.actor.eval()
+        self.critic.eval()
 
         self.step_counter += 1
         if state.ndim == 1:
@@ -108,8 +115,6 @@ class ProximalPolicyOptimizationAgent(DeepAgent):
             print(f"Episode: {self.episode_counter} | Train: {self.train_counter} | r: {self.reward_history[-1]:.6f}")
 
     def update_model(self, last_state):
-        self.actor.train()
-
         b_states = torch.tensor(np.array(self.state_buffer)).float().to(self.device)
         b_actions = torch.tensor(self.action_buffer).to(self.device)
         b_rewards = torch.tensor(self.reward_buffer).float().to(self.device)
@@ -120,6 +125,9 @@ class ProximalPolicyOptimizationAgent(DeepAgent):
         b_advantage, b_return = self.GAE(last_state, b_dones, b_rewards, b_values)
 
         b_inds = np.arange(self.step_count)
+
+        self.actor.train()
+        self.critic.train()
 
         for _ in range(self.epoch):
             if self.step_count <= self.batch:
@@ -144,19 +152,21 @@ class ProximalPolicyOptimizationAgent(DeepAgent):
 
             entropy_loss = ENTROPY.mean() * self.entropy_coef
 
-            critic_loss = self.loss_fn(V, b_return[mb_inds])
+            critic_loss = self.loss_fn(V, b_return[mb_inds]) * self.vf_coef
 
-            loss = -actor_loss + -entropy_loss + critic_loss
+            loss = -(actor_loss - critic_loss + entropy_loss)
 
             self.optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
+            torch.nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
             self.optimizer.step()
 
             self.train_counter += 1
 
             with torch.no_grad():
                 approx_kl = ((RATIO - 1) - log_ratio).mean()
-                if approx_kl >= self.kl_threshold:
+                if approx_kl >= self.target_kl:
                     print('break')
                     break
 
@@ -165,7 +175,7 @@ class ProximalPolicyOptimizationAgent(DeepAgent):
     @torch.no_grad()
     def GAE(self, last_state, dones, rewards, values):
         advantages = torch.zeros_like(rewards).to(self.device)
-        future_value = self.critic(torch.tensor(last_state).float().to(self.device)) * dones[self.step_count - 1]
+        future_value = self.critic(torch.tensor(last_state).unsqueeze(0).float().to(self.device)) * dones[self.step_count - 1]
         last_advantage = 0
         for i in reversed(range(self.step_count)):
             if i != self.step_count - 1:

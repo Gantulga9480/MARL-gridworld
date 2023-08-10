@@ -15,13 +15,9 @@ class Actor(nn.Module):
     def __init__(self, observation_size, action_size):
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(observation_size, 512),
+            nn.Linear(observation_size, 16),
             nn.LeakyReLU(),
-            nn.Linear(512, 256),
-            nn.LeakyReLU(),
-            nn.Linear(256, 128),
-            nn.LeakyReLU(),
-            nn.Linear(128, action_size),
+            nn.Linear(16, action_size),
             nn.Tanh()
         )
 
@@ -34,23 +30,19 @@ class Critic(nn.Module):
     def __init__(self, observation_size, action_size):
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(observation_size + action_size, 512),
+            nn.Linear(observation_size + action_size, 16),
             nn.LeakyReLU(),
-            nn.Linear(512, 256),
-            nn.LeakyReLU(),
-            nn.Linear(256, 128),
-            nn.LeakyReLU(),
-            nn.Linear(128, 1)
+            nn.Linear(16, 1)
         )
 
     def forward(self, state, action):
         return self.model(torch.cat([state, action], dim=1))
 
 
-ENV_NAME = "InvertedPendulum-v4"
+ENV_NAME = "MountainCarContinuous-v0"
 env = gym.make(ENV_NAME, render_mode=None)
 agent = DDPGAgent(env.observation_space.shape[0], env.action_space.shape[0], device="cuda:0")
-agent.create_model(Actor, Critic, actor_lr=0.0001, critic_lr=0.0001, gamma=0.99, noise_std=0.1, batch=64, tau=0.01)
+agent.create_model(Actor, Critic, actor_lr=0.003, critic_lr=0.003, gamma=0.99, noise_std=0.3, batch=64, tau=0.01)
 agent.create_buffer(ReplayBuffer(1_000_000, 1000, env.observation_space.shape[0], env.action_space.shape[0]))
 
 try:
@@ -58,7 +50,7 @@ try:
         done = False
         s, info = env.reset(seed=3407)
         while not done:
-            a = agent.policy(s) * 3.0
+            a = agent.policy(s)
             ns, r, d, t, i = env.step(a)
             done = d or t
             agent.learn(s, a, ns, r, done)
